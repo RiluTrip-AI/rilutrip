@@ -1,5 +1,5 @@
 import { type SupabaseClient } from "npm:@supabase/supabase-js@2";
-import { CREDIT_COSTS } from "../../../shared/credit-costs.ts";
+import { CREDIT_COSTS, type CreditAction } from "../../../shared/credit-costs.ts";
 
 export { CREDIT_COSTS };
 export type { CreditAction } from "../../../shared/credit-costs.ts";
