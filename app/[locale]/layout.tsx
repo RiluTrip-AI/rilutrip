@@ -7,7 +7,6 @@ import { ThemeProvider } from "@/lib/theme/theme-provider";
 import { AuthProvider } from "@/lib/auth/auth-context";
 import { Analytics } from "@vercel/analytics/next";
 import { Toaster } from "@/components/ui/toaster";
-import "../globals.css";
 
 export async function generateMetadata({
   params,
@@ -73,16 +72,14 @@ export default async function LocaleLayout({
   const messages = await getMessages();
 
   return (
-    <html lang={locale} suppressHydrationWarning>
-      <body>
-        <Analytics />
-        <NextIntlClientProvider messages={messages}>
-          <ThemeProvider>
-            <AuthProvider>{children}</AuthProvider>
-            <Toaster />
-          </ThemeProvider>
-        </NextIntlClientProvider>
-      </body>
-    </html>
+    <>
+      <Analytics />
+      <NextIntlClientProvider messages={messages}>
+        <ThemeProvider>
+          <AuthProvider>{children}</AuthProvider>
+          <Toaster />
+        </ThemeProvider>
+      </NextIntlClientProvider>
+    </>
   );
 }

@@ -17,6 +17,7 @@ export default defineConfig({
       reporter: ["text", "json", "html"],
       exclude: ["node_modules/", "test/", "**/*.config.{ts,js}", "**/*.d.ts"],
     },
+    maxWorkers: 4,
     server: {
       deps: {
         inline: ["next-intl"],
