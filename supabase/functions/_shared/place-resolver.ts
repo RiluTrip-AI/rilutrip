@@ -43,6 +43,10 @@ const DETAILS_FIELD_MASK = [
 
 const MAX_RETRIES = 3;
 
+// Cap concurrent Google Places calls. 5 is well under per-second quota and
+// avoids 429s while keeping latency low for the common batch size of ~10.
+const RESOLVE_BATCH_SIZE = 5;
+
 function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -287,9 +291,10 @@ async function resolvePlace(input: PlaceInput): Promise<ResolvedPlace> {
 
 export async function resolvePlacesInfo(places: PlaceInput[]): Promise<ResolvedPlace[]> {
   const resolved: ResolvedPlace[] = [];
-  for (const place of places) {
-    const result = await resolvePlace(place);
-    resolved.push(result);
+  for (let i = 0; i < places.length; i += RESOLVE_BATCH_SIZE) {
+    const batch = places.slice(i, i + RESOLVE_BATCH_SIZE);
+    const results = await Promise.all(batch.map(resolvePlace));
+    resolved.push(...results);
   }
   return resolved;
 }

@@ -16,7 +16,160 @@ const GenerateRequestSchema = z.object({
 
 type GenerateItineraryRequest = z.infer<typeof GenerateRequestSchema>;
 
+type GeneratedActivity = {
+  id: string;
+  time: string;
+  order: number;
+  title: string;
+  note?: string;
+  description?: string;
+  location: {
+    name: string;
+    lat?: number;
+    lng?: number;
+    place_id?: string;
+    opening_hours?: unknown;
+    [key: string]: unknown;
+  };
+  duration_minutes: number;
+  type?: "lunch" | "dinner" | "breakfast" | "transit";
+  opening_hours?: { open: string; close: string };
+  [key: string]: unknown;
+};
+
+type GeneratedDay = {
+  day_number: number;
+  activities: GeneratedActivity[];
+  start_time: string;
+  end_time: string;
+  transport_mode: string;
+  optimization_warnings?: OptimizeWarning[];
+};
+
+type OptimizeWarning =
+  | {
+      code: "ACTIVITY_WINDOW_TOO_SHORT";
+      dayNumber: number;
+      activityId: string;
+      title: string;
+      openingHours: { open: string; close: string };
+      durationMinutes: number;
+      availableMinutes: number;
+    }
+  | {
+      code: "ACTIVITY_UNASSIGNED_BY_ROUTE_CONSTRAINTS";
+      dayNumber: number;
+      activityId: string;
+      title: string;
+      durationMinutes: number;
+      reason?: "DAY_END" | "ROUTE_CONSTRAINTS";
+      dayEndTime?: string;
+    };
+
+type OptimizedDayResult = {
+  dayNumber: number;
+  activities: Array<{ id: string; time: string; order: number }>;
+  warnings?: OptimizeWarning[];
+};
+
+const TripSettingsSchema = z.object({
+  startTime: z.string().regex(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/),
+  endTime: z.string().regex(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/),
+  transportMode: z.enum(["walking", "bicycling", "driving", "transit"]),
+});
+
 import { buildItineraryPrompt } from "./prompt.ts";
+
+function calculateDayDate(startDate: string, dayNumber: number): string {
+  const date = new Date(`${startDate}T00:00:00`);
+  date.setDate(date.getDate() + dayNumber - 1);
+  return date.toISOString().split("T")[0];
+}
+
+async function sha256Hex(value: string): Promise<string> {
+  const bytes = new TextEncoder().encode(value);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function mergeOptimizedDays(days: GeneratedDay[], optimizedDays: OptimizedDayResult[]) {
+  return days.map((day) => {
+    const optimized = optimizedDays.find((candidate) => candidate.dayNumber === day.day_number);
+    if (!optimized) return day;
+
+    const updates = new Map(optimized.activities.map((activity) => [activity.id, activity]));
+    return {
+      ...day,
+      optimization_warnings: optimized.warnings ?? [],
+      activities: day.activities
+        .map((activity) => {
+          const update = updates.get(activity.id);
+          return update ? { ...activity, time: update.time, order: update.order } : activity;
+        })
+        .sort((a, b) => a.order - b.order),
+    };
+  });
+}
+
+async function optimizeGeneratedItinerary(input: {
+  itineraryId: string;
+  startDate: string;
+  days: GeneratedDay[];
+  authHeader: string;
+  skipCreditCaptureToken: string;
+}): Promise<GeneratedDay[]> {
+  const gatewaySecret = Deno.env.get("API_GATEWAY_SECRET");
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  if (!gatewaySecret || !supabaseUrl) return input.days;
+
+  const optimizableDays = input.days.filter((day) => day.activities.length >= 2);
+  if (optimizableDays.length === 0) return input.days;
+
+  try {
+    const response = await fetch(`${supabaseUrl}/functions/v1/optimize-route`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: input.authHeader,
+        "x-gateway-secret": gatewaySecret,
+      },
+      body: JSON.stringify({
+        itineraryId: input.itineraryId,
+        skipCreditCapture: true,
+        skipCreditCaptureToken: input.skipCreditCaptureToken,
+        days: optimizableDays.map((day) => ({
+          dayNumber: day.day_number,
+          date: calculateDayDate(input.startDate, day.day_number),
+          transportMode: day.transport_mode,
+          startTime: day.start_time,
+          endTime: day.end_time,
+          activities: day.activities.map((activity) => ({
+            id: activity.id,
+            title: activity.title,
+            location: activity.location,
+            duration_minutes: activity.duration_minutes,
+            time: activity.time,
+            ...(activity.type !== undefined && { type: activity.type }),
+            ...(activity.opening_hours !== undefined && { opening_hours: activity.opening_hours }),
+          })),
+        })),
+      }),
+    });
+
+    if (!response.ok) {
+      console.error("Auto route optimization failed:", response.status, await response.text());
+      return input.days;
+    }
+
+    const data = (await response.json()) as { days?: OptimizedDayResult[] };
+    return Array.isArray(data.days) ? mergeOptimizedDays(input.days, data.days) : input.days;
+  } catch (err) {
+    console.error("Auto route optimization failed:", err);
+    return input.days;
+  }
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -51,7 +204,7 @@ Deno.serve(async (req) => {
     // Fetch itinerary from DB — relying on RLS to enforce user ownership
     const { data: itineraryRow, error: fetchError } = await supabaseClient
       .from("itineraries")
-      .select("id, user_id, destination, start_date, end_date, preferences, status")
+      .select("id, user_id, destination, start_date, end_date, preferences, status, settings")
       .eq("id", itinerary_id)
       .single();
 
@@ -68,7 +221,14 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { destination, start_date: startDate, end_date: endDate, preferences } = itineraryRow;
+    const {
+      destination,
+      start_date: startDate,
+      end_date: endDate,
+      preferences,
+      settings: rawSettings,
+    } = itineraryRow;
+    const settings = TripSettingsSchema.parse(rawSettings);
 
     operationId = crypto.randomUUID();
 
@@ -182,6 +342,9 @@ Deno.serve(async (req) => {
           {
             day_number: number;
             activities: object[];
+            start_time: string;
+            end_time: string;
+            transport_mode: string;
           }
         >();
 
@@ -228,9 +391,16 @@ Deno.serve(async (req) => {
             order: dayMap.get(day_number)?.activities.length ?? 0,
           };
 
-          // Accumulate for DB save synchronously to maintain order
+          // Accumulate for DB save synchronously to maintain order.
+          // Stamp settings into each new day so the final DB write is complete.
           if (!dayMap.has(day_number)) {
-            dayMap.set(day_number, { day_number, activities: [] });
+            dayMap.set(day_number, {
+              day_number,
+              activities: [],
+              start_time: settings.startTime,
+              end_time: settings.endTime,
+              transport_mode: settings.transportMode,
+            });
           }
           dayMap.get(day_number)!.activities.push(activityWithId);
 
@@ -319,20 +489,46 @@ Deno.serve(async (req) => {
           await Promise.all(pendingResolutions);
 
           // Convert map to sorted array
-          const allDays = Array.from(dayMap.values()).sort((a, b) => a.day_number - b.day_number);
+          let allDays = Array.from(dayMap.values()).sort((a, b) => a.day_number - b.day_number);
+
+          const skipCreditCaptureToken = crypto.randomUUID();
+          const internalOptimizationTokenHash = await sha256Hex(skipCreditCaptureToken);
 
           // Save complete itinerary to DB
           const { error: updateError } = await supabaseAdmin
             .from("itineraries")
             .update({
               status: "completed",
-              data: { days: allDays },
+              data: {
+                days: allDays,
+                internal_optimization_token_hash: internalOptimizationTokenHash,
+              },
             })
             .eq("id", itinerary_id);
 
           if (updateError) {
             console.error("Failed to save itinerary to DB:", updateError);
             throw updateError;
+          }
+
+          allDays = await optimizeGeneratedItinerary({
+            itineraryId: itinerary_id,
+            startDate,
+            days: allDays as GeneratedDay[],
+            authHeader: req.headers.get("Authorization")!,
+            skipCreditCaptureToken,
+          });
+
+          const { error: optimizedUpdateError } = await supabaseAdmin
+            .from("itineraries")
+            .update({
+              data: { days: allDays },
+            })
+            .eq("id", itinerary_id);
+
+          if (optimizedUpdateError) {
+            console.error("Failed to save optimized itinerary to DB:", optimizedUpdateError);
+            throw optimizedUpdateError;
           }
           captured = false;
 

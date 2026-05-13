@@ -57,6 +57,9 @@ export const activityArbitrary = fc.record({
 export const dayArbitrary = fc.record({
   day_number: fc.integer({ min: 1, max: 30 }),
   activities: fc.array(activityArbitrary, { minLength: 0, maxLength: 10 }),
+  start_time: fc.constant("09:00"),
+  end_time: fc.constant("21:00"),
+  transport_mode: fc.constantFrom("driving", "walking", "transit", "bicycling"),
 });
 
 /**

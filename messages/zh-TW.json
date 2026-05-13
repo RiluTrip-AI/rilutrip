@@ -29,7 +29,8 @@
     "noteMaxLength": "筆記最多 500 個字元",
     "preferencesMaxLength": "偏好最多 1000 個字元",
     "pastDateNotAllowed": "不能選擇過去的日期",
-    "dateTooLong": "行程天數不能超過 14 天"
+    "dateTooLong": "行程天數不能超過 14 天",
+    "endTimeAfterStart": "結束時間必須晚於開始時間"
   },
   "landing": {
     "hero": {
@@ -48,7 +49,10 @@
       "itineraryLimitError": "您目前方案可建立的行程數量已達上限。",
       "createError": "建立行程失敗。請重試。",
       "perfectArrangeButton": "完美安排",
-      "autoOptimizing": "路線優化中..."
+      "autoOptimizing": "路線優化中...",
+      "dailyTimeRange": "每日時間範圍",
+      "transportMode": "交通方式",
+      "optional": "（選填）"
     },
     "trending": {
       "title": "熱門目的地",
@@ -123,6 +127,17 @@
     "generationTimeout": "行程產生處理逾時，請再試一次。",
     "generating": "正在產生您的行程中...",
     "errorUpdateDays": "更新行程順序失敗，請再試一次。",
+    "routeWarnings": {
+      "unscheduledSection": "無法安排",
+      "unscheduledTime": "未安排",
+      "openingHoursLabel": "營業時間：{hours}",
+      "openingHoursUnknown": "未取得營業時間",
+      "openingWindowTooShort": "營業時間不足：可安排 {availableMinutes} 分鐘，停留時間 {durationMinutes} 分鐘",
+      "openingHoursMissed": "需在 {latestStart} 前開始，才能於 {close} 前完成",
+      "dayEndExceeded": "加上移動與停留時間後，無法在當天 {dayEndTime} 前完成",
+      "dayEndFallback": "結束時間",
+      "routeConstraints": "無法在當天時間與營業時間限制內安排"
+    },
     "transportMode": {
       "driving": "開車",
       "walking": "步行",
@@ -208,7 +223,14 @@
       "confirmDeleteItinerary": "確認刪除",
       "errorSave": "儲存變更失敗，請再試一次。",
       "errorDeleteItinerary": "刪除行程失敗，請再試一次。"
-    }
+    },
+    "errorOptimizeInsufficientCredits": "點數不足，無法最佳化路線。",
+    "errorOptimizeRateLimited": "請稍候再試，路線最佳化請求太頻繁。",
+    "errorOptimizeFailed": "路線最佳化失敗，請再試一次。",
+    "dayActivityDurationOverloaded": "活動時間超出時間範圍",
+    "optimizeDayRoute": "最佳化路線",
+    "optimizingRoute": "最佳化中...",
+    "dayLabel": "第 {day} 天"
   },
   "activityType": {
     "lunch": "午餐",

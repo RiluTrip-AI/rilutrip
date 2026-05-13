@@ -245,10 +245,17 @@ describe("Data Model Validation Properties", () => {
             days: [
               {
                 day_number: 1,
-                date: startDate,
                 activities: [],
+                start_time: "09:00",
+                end_time: "21:00",
+                transport_mode: "driving",
               },
             ],
+            settings: {
+              startTime: "09:00",
+              endTime: "21:00",
+              transportMode: "driving",
+            },
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           });
@@ -273,6 +280,9 @@ describe("Data Model Validation Properties", () => {
               day_number: invalidDayNumber,
               date: "2024-01-01",
               activities: [],
+              start_time: "09:00",
+              end_time: "21:00",
+              transport_mode: "driving",
             });
             expect(result.success).toBe(false);
           },
@@ -295,6 +305,7 @@ describe("Data Model Validation Properties", () => {
             const result = DaySchema.safeParse({
               day_number: 1,
               activities: [],
+              transport_mode: "driving",
               start_time,
               end_time,
             });

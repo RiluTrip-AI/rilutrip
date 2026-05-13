@@ -2,6 +2,12 @@ import { describe, it, expect } from "vitest";
 import { createTripFormSchema, createActivityFormSchema } from "@/types/forms";
 
 describe("Zod i18n Integration E2E", () => {
+  const tripDefaults = {
+    startTime: "09:00",
+    endTime: "21:00",
+    transportMode: "driving" as const,
+  };
+
   describe("English translations", () => {
     const enMessages = {
       "validation.destinationRequired": "Destination is required",
@@ -23,6 +29,7 @@ describe("Zod i18n Integration E2E", () => {
       const result = schema.safeParse({
         destination: "",
         dates: { from: new Date(), to: new Date() },
+        ...tripDefaults,
       });
 
       expect(result.success).toBe(false);
@@ -39,6 +46,7 @@ describe("Zod i18n Integration E2E", () => {
       const result = schema.safeParse({
         destination: "Tokyo",
         dates: { from: start, to: end },
+        ...tripDefaults,
       });
 
       expect(result.success).toBe(false);
@@ -85,6 +93,7 @@ describe("Zod i18n Integration E2E", () => {
       const result = schema.safeParse({
         destination: "",
         dates: { from: new Date(), to: new Date() },
+        ...tripDefaults,
       });
 
       expect(result.success).toBe(false);
@@ -101,6 +110,7 @@ describe("Zod i18n Integration E2E", () => {
       const result = schema.safeParse({
         destination: "Tokyo",
         dates: { from: start, to: end },
+        ...tripDefaults,
       });
 
       expect(result.success).toBe(false);
