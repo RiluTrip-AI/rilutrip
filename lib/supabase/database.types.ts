@@ -8,6 +8,89 @@ export type Database = {
   };
   public: {
     Tables: {
+      api_rate_limit_bans: {
+        Row: {
+          banned_until: string;
+          endpoint: string;
+          user_id: string;
+        };
+        Insert: {
+          banned_until: string;
+          endpoint: string;
+          user_id: string;
+        };
+        Update: {
+          banned_until?: string;
+          endpoint?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      api_rate_limits: {
+        Row: {
+          count: number;
+          endpoint: string;
+          user_id: string;
+          window_start: string;
+        };
+        Insert: {
+          count?: number;
+          endpoint: string;
+          user_id: string;
+          window_start: string;
+        };
+        Update: {
+          count?: number;
+          endpoint?: string;
+          user_id?: string;
+          window_start?: string;
+        };
+        Relationships: [];
+      };
+      day_matrices: {
+        Row: {
+          activity_ids: string[];
+          location_fingerprint: string;
+          day_number: number;
+          id: string;
+          itinerary_id: string;
+          matrix: Json;
+          matrix_source: string;
+          transport_mode: string;
+          updated_at: string;
+        };
+        Insert: {
+          activity_ids: string[];
+          location_fingerprint: string;
+          day_number: number;
+          id?: string;
+          itinerary_id: string;
+          matrix: Json;
+          matrix_source?: string;
+          transport_mode: string;
+          updated_at?: string;
+        };
+        Update: {
+          activity_ids?: string[];
+          location_fingerprint?: string;
+          day_number?: number;
+          id?: string;
+          itinerary_id?: string;
+          matrix?: Json;
+          matrix_source?: string;
+          transport_mode?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "day_matrices_itinerary_id_fkey";
+            columns: ["itinerary_id"];
+            isOneToOne: false;
+            referencedRelation: "itineraries";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       google_places: {
         Row: {
           lat: number | null;
@@ -53,6 +136,7 @@ export type Database = {
           id: string;
           link_access: Database["public"]["Enums"]["link_access_level"];
           preferences: string | null;
+          settings: Json;
           start_date: string;
           status: string;
           title: string;
@@ -67,6 +151,7 @@ export type Database = {
           id?: string;
           link_access?: Database["public"]["Enums"]["link_access_level"];
           preferences?: string | null;
+          settings: Json;
           start_date: string;
           status?: string;
           title: string;
@@ -81,6 +166,7 @@ export type Database = {
           id?: string;
           link_access?: Database["public"]["Enums"]["link_access_level"];
           preferences?: string | null;
+          settings?: Json;
           start_date?: string;
           status?: string;
           title?: string;
@@ -171,6 +257,7 @@ export type Database = {
         Args: { p_amount: number; p_user_id: string };
         Returns: boolean;
       };
+      cleanup_api_rate_limits: { Args: never; Returns: undefined };
       delete_expired_google_places: { Args: never; Returns: undefined };
       get_public_itinerary: {
         Args: { p_id: string };
@@ -182,6 +269,7 @@ export type Database = {
           id: string;
           link_access: string;
           preferences: string;
+          settings: Json;
           start_date: string;
           status: string;
           title: string;
@@ -189,6 +277,26 @@ export type Database = {
           user_id: string;
         }[];
       };
+      increment_and_check_rate_limit:
+        | {
+            Args: {
+              p_endpoint: string;
+              p_max_count: number;
+              p_user_id: string;
+              p_window_seconds: number;
+            };
+            Returns: boolean;
+          }
+        | {
+            Args: {
+              p_ban_seconds?: number;
+              p_endpoint: string;
+              p_max_count: number;
+              p_user_id: string;
+              p_window_seconds: number;
+            };
+            Returns: boolean;
+          };
       is_itinerary_owner: { Args: { itinerary_uuid: string }; Returns: boolean };
       refund_credits: {
         Args: { p_amount: number; p_user_id: string };
@@ -204,6 +312,7 @@ export type Database = {
           id: string;
           link_access: string;
           preferences: string;
+          settings: Json;
           start_date: string;
           status: string;
           title: string;
