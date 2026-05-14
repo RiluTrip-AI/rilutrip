@@ -1,5 +1,11 @@
 import { create } from "zustand";
-import type { Itinerary, Activity, TransportMode } from "@/types/itinerary";
+import {
+  DEFAULT_TRIP_SETTINGS,
+  type Itinerary,
+  type Activity,
+  type OptimizeWarning,
+  type TransportMode,
+} from "@/types/itinerary";
 import type { AccessContext } from "@/types/share";
 import type { Active, Over } from "@dnd-kit/core";
 import { calculateDragOverUpdate } from "./utils/drag-handlers";
@@ -11,12 +17,60 @@ import {
 import { getEffectivePermission } from "@/lib/supabase/shares";
 import { applyOperations, type OperationsUpdate } from "@/lib/ai/operations";
 import { aiClient, ApiError } from "@/lib/ai/client";
-import { calcDayCount } from "@/lib/utils/date";
+import { calcDayCount, calculateDayDate } from "@/lib/utils/date";
 import { adjustDays } from "@/lib/utils/itinerary";
 import { resolvePlaceDetails, type ResolveStatus } from "@/lib/places/place-resolver";
+import { getAccessToken } from "@/lib/supabase/client";
+import { deleteDayMatrix, loadAllDayMatrices, type DayMatrix } from "@/lib/supabase/day-matrices";
+
+export type OptimizeErrorKind = "INSUFFICIENT_CREDITS" | "GENERIC";
+
+export class OptimizeError extends Error {
+  constructor(public kind: OptimizeErrorKind) {
+    super(`OptimizeError: ${kind}`);
+    this.name = "OptimizeError";
+  }
+}
+
+type MatrixSource = DayMatrix["matrixSource"];
+
+type ApiOptimizedDayWithoutMatrix = {
+  dayNumber: number;
+  activities: Array<{ id: string; time: string; order: number }>;
+  warnings?: OptimizeWarning[];
+};
+type ApiOptimizedDayWithMatrix = ApiOptimizedDayWithoutMatrix & {
+  matrixActivityIds: string[];
+  matrix: number[][];
+  transportMode: TransportMode;
+  locationFingerprint: string;
+  matrixSource: MatrixSource;
+};
+type ApiOptimizedDay = ApiOptimizedDayWithoutMatrix | ApiOptimizedDayWithMatrix;
+
+function hasReturnedMatrix(day: ApiOptimizedDay): day is ApiOptimizedDayWithMatrix {
+  return (
+    "matrixActivityIds" in day &&
+    Array.isArray(day.matrixActivityIds) &&
+    day.matrixActivityIds.length > 0 &&
+    Array.isArray(day.matrix) &&
+    typeof day.transportMode === "string" &&
+    typeof day.locationFingerprint === "string" &&
+    typeof day.matrixSource === "string"
+  );
+}
+
+function buildOptimizeWarningsByActivity(itinerary: Itinerary): Map<string, OptimizeWarning> {
+  const warnings = new Map<string, OptimizeWarning>();
+  itinerary.days.forEach((day) => {
+    day.optimization_warnings?.forEach((warning) => {
+      warnings.set(warning.activityId, warning);
+    });
+  });
+  return warnings;
+}
 
 let pollingIntervalHandle: ReturnType<typeof setInterval> | null = null;
-
 const MAX_HISTORY_ENTRIES = 50;
 type ItineraryErrorKind = "access" | "load" | "runtime" | null;
 
@@ -32,9 +86,15 @@ interface ItineraryState {
 
   // Generation State
   isGenerating: boolean;
+  optimizingDays: Set<number>;
   isSaving: boolean;
   saveError: boolean;
   generationAbortController: AbortController | null;
+
+  // Trip Defaults (set from the trip creation form)
+  defaultStartTime: string;
+  defaultEndTime: string;
+  defaultTransportMode: TransportMode;
 
   // Interaction State
   previewBaseItinerary: Itinerary | null;
@@ -104,10 +164,23 @@ interface ItineraryState {
   setDayTransportMode: (dayNumber: number, mode: TransportMode) => Promise<void>;
   setAllDaysTransportMode: (mode: TransportMode) => Promise<void>;
 
+  // Route Matrix State
+  dayMatrices: Map<number, DayMatrix>;
+  optimizeWarnings: Map<string, OptimizeWarning>;
+
   // Generation Actions
   startGeneration: (itineraryId: string, locale: string, onComplete?: () => void) => void;
   stopGeneration: () => void;
   applyOperations: (ops: OperationsUpdate) => Promise<void>;
+  optimizeDayRoutes: (dayNumbers?: number[]) => Promise<void>;
+  getActivityDurationOverloadedDays: () => Set<number>;
+  loadDayMatrices: (itineraryId: string) => Promise<void>;
+  invalidateDayMatrix: (dayNumber: number) => Promise<void>;
+  setTripDefaults: (defaults: {
+    startTime: string;
+    endTime: string;
+    transportMode: TransportMode;
+  }) => void;
 
   // Drag & Drop Actions
   handleDragOver: (
@@ -144,9 +217,15 @@ export const useItineraryStore = create<ItineraryState>((set, get) => ({
   historyFuture: [],
   access: { permission: "none", source: null },
   isGenerating: false,
+  optimizingDays: new Set<number>(),
+  dayMatrices: new Map<number, DayMatrix>(),
+  optimizeWarnings: new Map<string, OptimizeWarning>(),
   isSaving: false,
   saveError: false,
   generationAbortController: null,
+  defaultStartTime: DEFAULT_TRIP_SETTINGS.startTime,
+  defaultEndTime: DEFAULT_TRIP_SETTINGS.endTime,
+  defaultTransportMode: DEFAULT_TRIP_SETTINGS.transportMode,
   previewBaseItinerary: null,
   previewItinerary: null,
   crossDayDragInfo: null,
@@ -222,7 +301,15 @@ export const useItineraryStore = create<ItineraryState>((set, get) => ({
         historyFuture: [],
         previewBaseItinerary: null,
         previewItinerary: null,
+        dayMatrices: new Map(),
+        optimizeWarnings: buildOptimizeWarningsByActivity(data),
       });
+      if (data.settings) {
+        get().setTripDefaults(data.settings);
+      }
+      get()
+        .loadDayMatrices(data.id)
+        .catch(() => {});
     } catch (err) {
       if (err instanceof ItineraryUnavailableError) {
         set({ errorKind: "access", errorCode: "ITINERARY_UNAVAILABLE" });
@@ -250,6 +337,7 @@ export const useItineraryStore = create<ItineraryState>((set, get) => ({
       end_date: nextItinerary.end_date,
       preferences: nextItinerary.preferences,
       days: nextItinerary.days,
+      settings: nextItinerary.settings,
     };
 
     const nextPast = [...state.historyPast, cloneItinerarySnapshot(currentItinerary)].slice(
@@ -413,9 +501,20 @@ export const useItineraryStore = create<ItineraryState>((set, get) => ({
       return;
     }
 
+    // Keep cached matrices for reorder/delete-only changes; they can still answer subset lookups.
+    const changedDayNumbers = new Set<number>();
+    for (const previewDay of previewItinerary.days) {
+      const baseDay = previewBaseItinerary.days.find((d) => d.day_number === previewDay.day_number);
+      const baseIds = new Set((baseDay?.activities ?? []).map((a) => a.id));
+      if (previewDay.activities.some((activity) => !baseIds.has(activity.id))) {
+        changedDayNumbers.add(previewDay.day_number);
+      }
+    }
+
     set({ isSaving: true, saveError: false });
     try {
       await get().commitItineraryChange(previewItinerary);
+      await Promise.all([...changedDayNumbers].map((dn) => get().invalidateDayMatrix(dn)));
     } catch (err) {
       set({ saveError: true });
       throw err;
@@ -460,7 +559,7 @@ export const useItineraryStore = create<ItineraryState>((set, get) => ({
         updates.preferences !== undefined ? updates.preferences : currentItinerary.preferences,
       days:
         newDayCount !== oldDayCount
-          ? adjustDays(currentItinerary.days, newDayCount)
+          ? adjustDays(currentItinerary.days, newDayCount, currentItinerary.settings)
           : currentItinerary.days,
     };
 
@@ -471,6 +570,13 @@ export const useItineraryStore = create<ItineraryState>((set, get) => ({
     set({ isSaving: true, saveError: false });
     try {
       await get().commitItineraryChange(nextItinerary);
+      if (newDayCount < oldDayCount) {
+        const removedDayNumbers = Array.from(
+          { length: oldDayCount - newDayCount },
+          (_, i) => newDayCount + 1 + i,
+        );
+        await Promise.all(removedDayNumbers.map((dn) => get().invalidateDayMatrix(dn)));
+      }
     } catch (err) {
       console.error("Failed to update itinerary metadata:", err);
       set({ saveError: true });
@@ -486,7 +592,6 @@ export const useItineraryStore = create<ItineraryState>((set, get) => ({
     const currentItinerary = state.itinerary;
     if (!currentItinerary) return;
 
-    // 1. 本地透過 AI operations 計算出預期的 itinerary 狀態
     const optimisticItinerary = await applyOperations(currentItinerary, ops);
 
     set({ isSaving: true, saveError: false });
@@ -548,6 +653,7 @@ export const useItineraryStore = create<ItineraryState>((set, get) => ({
         updated_at: new Date().toISOString(),
       });
       get().setHoveredActivity(activity.id);
+      await get().invalidateDayMatrix(dayNumber);
       return { resolveStatus };
     } catch (err) {
       console.error("Failed to add activity:", err);
@@ -564,9 +670,13 @@ export const useItineraryStore = create<ItineraryState>((set, get) => ({
     if (!state.itinerary) return { resolveStatus: "success" };
 
     let existingActivity: Activity | undefined;
+    let activityDayNumber: number | undefined;
     for (const day of state.itinerary.days) {
       existingActivity = day.activities.find((a) => a.id === activityId);
-      if (existingActivity) break;
+      if (existingActivity) {
+        activityDayNumber = day.day_number;
+        break;
+      }
     }
 
     if (!existingActivity) {
@@ -582,11 +692,13 @@ export const useItineraryStore = create<ItineraryState>((set, get) => ({
 
     if (!isDirty) return { resolveStatus: "success" };
 
+    const locationChanged = activityInput.locationName !== existingActivity.location.name;
+
     set({ isSaving: true, saveError: false });
     try {
       let resolvedLocation = existingActivity.location;
       let resolveStatus: ResolveStatus = "success";
-      if (activityInput.locationName !== existingActivity.location.name) {
+      if (locationChanged) {
         const resolved = await resolvePlaceDetails({
           name: activityInput.locationName,
         });
@@ -617,6 +729,9 @@ export const useItineraryStore = create<ItineraryState>((set, get) => ({
         updated_at: new Date().toISOString(),
       });
       get().setHoveredActivity(activityId);
+      if (locationChanged && activityDayNumber !== undefined) {
+        await get().invalidateDayMatrix(activityDayNumber);
+      }
       return { resolveStatus };
     } catch (err) {
       console.error("Failed to update activity:", err);
@@ -714,6 +829,7 @@ export const useItineraryStore = create<ItineraryState>((set, get) => ({
         days: newDays,
         updated_at: new Date().toISOString(),
       });
+      await get().invalidateDayMatrix(dayNumber);
     } catch (err) {
       console.error("Failed to set day transport mode:", err);
       set({ saveError: true });
@@ -734,6 +850,7 @@ export const useItineraryStore = create<ItineraryState>((set, get) => ({
         days: newDays,
         updated_at: new Date().toISOString(),
       });
+      await Promise.all(newDays.map((day) => get().invalidateDayMatrix(day.day_number)));
     } catch (err) {
       console.error("Failed to set all days transport mode:", err);
       set({ saveError: true });
@@ -751,11 +868,24 @@ export const useItineraryStore = create<ItineraryState>((set, get) => ({
     try {
       const status = state.itinerary?.status;
       if (status === "generating") {
-        // Resumed mid-generation (user refreshed / navigated back) → poll DB.
+        // Resumed mid-generation (user refreshed / navigated back), then poll DB.
         await startPollingInternal(itineraryId, set);
       } else {
-        // Fresh draft / retry after failure → open SSE stream.
+        // Fresh draft / retry after failure, then open SSE stream.
         await startStreamingInternal(itineraryId, locale, get, set);
+      }
+
+      if (!get().errorKind) {
+        try {
+          const completedItinerary = await loadItinerary(itineraryId);
+          set({ itinerary: completedItinerary });
+          get().setTripDefaults(completedItinerary.settings);
+          get()
+            .loadDayMatrices(completedItinerary.id)
+            .catch(() => {});
+        } catch (err) {
+          console.error("Failed to reload completed itinerary after generation:", err);
+        }
       }
     } finally {
       // Always call onComplete, regardless of success or failure
@@ -776,6 +906,174 @@ export const useItineraryStore = create<ItineraryState>((set, get) => ({
 
     set({ isGenerating: false, generationAbortController: null });
   },
+
+  getActivityDurationOverloadedDays: () => {
+    const { itinerary } = get();
+    if (!itinerary) return new Set<number>();
+    const activityDurationOverloaded = new Set<number>();
+    for (const day of itinerary.days) {
+      const [sh, sm] = day.start_time.split(":").map(Number);
+      const [eh, em] = day.end_time.split(":").map(Number);
+      const windowMinutes = eh * 60 + em - (sh * 60 + sm);
+      const totalDuration = day.activities.reduce((sum, a) => sum + a.duration_minutes, 0);
+      if (totalDuration >= windowMinutes) activityDurationOverloaded.add(day.day_number);
+    }
+    return activityDurationOverloaded;
+  },
+
+  optimizeDayRoutes: async (dayNumbers?: number[]) => {
+    const { itinerary } = get();
+    if (!itinerary) return;
+
+    const daysToOptimize = itinerary.days.filter(
+      (d) => d.activities.length >= 2 && (!dayNumbers || dayNumbers.includes(d.day_number)),
+    );
+    if (daysToOptimize.length === 0) return;
+
+    const pendingDayNumbers = new Set(daysToOptimize.map((d) => d.day_number));
+    set((s) => ({ optimizingDays: new Set([...s.optimizingDays, ...pendingDayNumbers]) }));
+    try {
+      const token = await getAccessToken();
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      if (!supabaseUrl) throw new OptimizeError("GENERIC");
+      const response = await fetch(`${supabaseUrl}/functions/v1/optimize-route`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+        body: JSON.stringify({
+          itineraryId: itinerary.id,
+          days: daysToOptimize.map((d) => ({
+            dayNumber: d.day_number,
+            date: calculateDayDate(itinerary.start_date, d.day_number),
+            transportMode: d.transport_mode,
+            startTime: d.start_time,
+            endTime: d.end_time,
+            activities: d.activities.map((a) => ({
+              id: a.id,
+              title: a.title,
+              location: a.location,
+              duration_minutes: a.duration_minutes,
+              time: a.time,
+              type: a.type,
+              opening_hours: a.opening_hours,
+            })),
+          })),
+        }),
+      });
+
+      if (!response.ok) {
+        if (response.status === 402) throw new OptimizeError("INSUFFICIENT_CREDITS");
+        throw new OptimizeError("GENERIC");
+      }
+
+      const { days: optimizedDays, warnings = [] } = (await response.json()) as {
+        days: ApiOptimizedDay[];
+        warnings?: OptimizeWarning[];
+      };
+      const returnedWarnings = new Map<string, OptimizeWarning>();
+      [...optimizedDays.flatMap((day) => day.warnings ?? []), ...warnings].forEach((warning) => {
+        returnedWarnings.set(warning.activityId, warning);
+      });
+
+      const current = get().itinerary;
+      if (!current) return;
+      const optimizedActivityIds = new Set(
+        optimizedDays.flatMap((day) => day.activities.map((activity) => activity.id)),
+      );
+
+      const updatedDays = current.days.map((day) => {
+        const result = optimizedDays.find((r) => r.dayNumber === day.day_number);
+        if (!result) return day;
+
+        const activityUpdates = new Map(result.activities.map((a) => [a.id, a]));
+        const updatedActivities = day.activities
+          .map((act) => {
+            const update = activityUpdates.get(act.id);
+            return update ? { ...act, time: update.time, order: update.order } : act;
+          })
+          .sort((a, b) => a.order - b.order);
+
+        return {
+          ...day,
+          activities: updatedActivities,
+          optimization_warnings: result.activities
+            .map((activity) => returnedWarnings.get(activity.id))
+            .filter((warning): warning is OptimizeWarning => warning !== undefined),
+        };
+      });
+
+      await get().commitItineraryChange({
+        ...current,
+        days: updatedDays,
+        updated_at: new Date().toISOString(),
+      });
+      set((s) => {
+        const next = new Map(s.optimizeWarnings);
+        optimizedActivityIds.forEach((activityId) => next.delete(activityId));
+        returnedWarnings.forEach((warning, activityId) => next.set(activityId, warning));
+        return { optimizeWarnings: next };
+      });
+      optimizedDays.forEach((result) => {
+        if (!hasReturnedMatrix(result)) return;
+        set((s) => {
+          const next = new Map(s.dayMatrices);
+          next.set(result.dayNumber, {
+            activityIds: result.matrixActivityIds,
+            matrix: result.matrix,
+            transportMode: result.transportMode,
+            locationFingerprint: result.locationFingerprint,
+            matrixSource: result.matrixSource,
+          });
+          return { dayMatrices: next };
+        });
+      });
+    } catch (err) {
+      console.error("Route optimization failed:", err);
+      if (err instanceof OptimizeError) throw err;
+      throw new OptimizeError("GENERIC");
+    } finally {
+      set((s) => {
+        const next = new Set(s.optimizingDays);
+        pendingDayNumbers.forEach((n) => next.delete(n));
+        return { optimizingDays: next };
+      });
+    }
+  },
+
+  loadDayMatrices: async (itineraryId: string) => {
+    try {
+      const matrices = await loadAllDayMatrices(itineraryId);
+      set({ dayMatrices: matrices });
+    } catch (err) {
+      console.error("Failed to load day matrices:", err);
+    }
+  },
+
+  invalidateDayMatrix: async (dayNumber) => {
+    const { itinerary } = get();
+    if (!itinerary) return;
+
+    set((s) => {
+      const next = new Map(s.dayMatrices);
+      next.delete(dayNumber);
+      return { dayMatrices: next };
+    });
+
+    try {
+      await deleteDayMatrix(itinerary.id, dayNumber);
+    } catch (err) {
+      console.error("Failed to delete stale day matrix:", err);
+    }
+  },
+
+  setTripDefaults: ({ startTime, endTime, transportMode }) =>
+    set({
+      defaultStartTime: startTime,
+      defaultEndTime: endTime,
+      defaultTransportMode: transportMode,
+    }),
 
   // Drag & Drop Logic
   handleDragOver: (active, over, activeData, overData) => {
@@ -843,6 +1141,9 @@ async function startStreamingInternal(
       (data) => appendStreamedActivityInternal(data.day_number, data.activity, set),
       () => {
         set({ isGenerating: false, generationAbortController: null });
+        // Abort the SSE connection so fetchEventSource doesn't reconnect,
+        // allowing startStreamingInternal to return and trigger post-generation steps.
+        controller.abort();
       },
       () => {
         set({
@@ -851,6 +1152,7 @@ async function startStreamingInternal(
           errorCode: "GENERATION_FAILED",
           generationAbortController: null,
         });
+        controller.abort();
       },
       controller.signal,
     );
@@ -933,7 +1235,7 @@ async function startPollingInternal(itineraryId: string, set: StoreSet): Promise
           });
           resolve(); // Resolve on failure
         }
-        // status === "generating" → keep polling.
+        // status === "generating"; keep polling.
       } catch {
         // Transient errors: keep polling (the next tick will retry).
       }
@@ -961,7 +1263,13 @@ function appendStreamedActivityInternal(
         activities: updatedActivities,
       };
     } else {
-      days.push({ day_number: dayNumber, activities: [activity] });
+      days.push({
+        day_number: dayNumber,
+        activities: [activity],
+        start_time: state.defaultStartTime,
+        end_time: state.defaultEndTime,
+        transport_mode: state.defaultTransportMode,
+      });
       days.sort((a, b) => a.day_number - b.day_number);
     }
 

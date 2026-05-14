@@ -87,4 +87,78 @@ describe("ActivityCard", () => {
     expect(createPlaceSearchLinkMock).toHaveBeenCalledWith({ name: "City Museum" });
     expect(openSpy).toHaveBeenCalledWith("https://maps.example.com/place", "_blank");
   });
+
+  it("shows the normalized opening hours on every activity card", () => {
+    render(
+      <ActivityCard
+        activity={{
+          ...baseActivity,
+          opening_hours: {
+            open: "09:30",
+            close: "17:00",
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Opening hours: 09:30-17:00")).toBeInTheDocument();
+  });
+
+  it("shows unavailable opening hours when no opening data exists", () => {
+    render(<ActivityCard activity={baseActivity} />);
+
+    expect(screen.getByText("Opening hours unavailable")).toBeInTheDocument();
+  });
+
+  it("shows only the matching day opening hours from weekly descriptions", () => {
+    render(
+      <ActivityCard
+        activity={{
+          ...baseActivity,
+          location: {
+            ...baseActivity.location,
+            opening_hours: {
+              weekdayDescriptions: [
+                "Monday: Closed",
+                "Tuesday: 07:30 - 15:30",
+                "Wednesday: 07:30 - 15:30",
+                "Thursday: 07:30 - 15:30",
+                "Friday: 09:00 - 17:00",
+                "Saturday: 10:00 - 18:00",
+                "Sunday: Closed",
+              ],
+            },
+          },
+        }}
+        dayDate="2026-06-19"
+      />,
+    );
+
+    expect(screen.getByText("Opening hours: 09:00 - 17:00")).toBeInTheDocument();
+    expect(screen.queryByText(/Tuesday/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Saturday/)).not.toBeInTheDocument();
+  });
+
+  it("marks the time badge as unscheduled when the activity has an optimize warning", () => {
+    render(
+      <ActivityCard
+        activity={baseActivity}
+        optimizeWarning={{
+          code: "ACTIVITY_WINDOW_TOO_SHORT",
+          dayNumber: 1,
+          activityId: baseActivity.id,
+          title: baseActivity.title,
+          openingHours: {
+            open: "11:00",
+            close: "11:30",
+          },
+          availableMinutes: 30,
+          durationMinutes: 90,
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Unscheduled")).toBeInTheDocument();
+    expect(screen.queryByText("10:00")).not.toBeInTheDocument();
+  });
 });

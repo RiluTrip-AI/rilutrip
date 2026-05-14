@@ -6,9 +6,10 @@
 
 "use client";
 
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { DayActivitiesList } from "../components/day-activities-list";
 import { DayTimePicker } from "../components/day-time-picker";
 import { DayTransportPicker } from "../components/day-transport-picker";
@@ -27,8 +28,12 @@ export function SideBySideView({
   setAllDaysTimeWindow,
   setDayTransportMode,
   setAllDaysTransportMode,
+  activityDurationOverloadedDays,
+  optimizingDays,
+  onOptimizeDay,
 }: SideBySideViewProps) {
   const locale = useLocale();
+  const t = useTranslations("planner");
 
   return (
     <div className="flex-1 overflow-x-auto overflow-y-auto">
@@ -47,8 +52,25 @@ export function SideBySideView({
                   onMouseEnter={() => onDayHover?.(day.day_number)}
                   onMouseLeave={() => onDayHover?.(null)}
                 >
-                  <CardTitle className="text-base font-semibold">Day {day.day_number}</CardTitle>
+                  <div className="flex items-center gap-2">
+                    <CardTitle className="text-base font-semibold">
+                      {t("dayLabel", { day: day.day_number })}
+                    </CardTitle>
+                    {activityDurationOverloadedDays.has(day.day_number) && (
+                      <span
+                        className="text-xs text-amber-600 dark:text-amber-400 font-medium"
+                        title={t("dayActivityDurationOverloaded")}
+                      >
+                        !
+                      </span>
+                    )}
+                  </div>
                   <p className="text-sm text-muted-foreground mt-1">{formattedDate}</p>
+                  {activityDurationOverloadedDays.has(day.day_number) && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                      {t("dayActivityDurationOverloaded")}
+                    </p>
+                  )}
                   <DayTimePicker
                     dayNumber={day.day_number}
                     startTime={day.start_time}
@@ -62,10 +84,24 @@ export function SideBySideView({
                     onSave={setDayTransportMode}
                     onApplyAll={setAllDaysTransportMode}
                   />
+                  {onOptimizeDay !== null && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full mt-1 h-7 text-xs"
+                      disabled={optimizingDays.has(day.day_number)}
+                      onClick={() => onOptimizeDay(day.day_number)}
+                    >
+                      {optimizingDays.has(day.day_number)
+                        ? t("optimizingRoute")
+                        : t("optimizeDayRoute")}
+                    </Button>
+                  )}
                 </CardHeader>
                 <CardContent className="p-4 flex-1 overflow-y-auto">
                   <DayActivitiesList
                     day={day}
+                    dayDate={calculateDayDate(itinerary.start_date, day.day_number)}
                     draggingActivityId={draggingActivityId}
                     crossDayDragInfo={crossDayDragInfo}
                     onActivityHover={onActivityHover}

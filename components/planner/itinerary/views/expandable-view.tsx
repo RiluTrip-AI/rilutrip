@@ -6,9 +6,10 @@
 
 "use client";
 
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { DayActivitiesList } from "../components/day-activities-list";
 import { DayTimePicker } from "../components/day-time-picker";
 import { DayTransportPicker } from "../components/day-transport-picker";
@@ -29,8 +30,12 @@ export function ExpandableView({
   setAllDaysTimeWindow,
   setDayTransportMode,
   setAllDaysTransportMode,
+  activityDurationOverloadedDays,
+  optimizingDays,
+  onOptimizeDay,
 }: ExpandableViewProps) {
   const locale = useLocale();
+  const t = useTranslations("planner");
 
   return (
     <div className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -51,7 +56,19 @@ export function ExpandableView({
             >
               <div className="flex items-center justify-between">
                 <div className="flex-1">
-                  <CardTitle className="text-base font-semibold">Day {day.day_number}</CardTitle>
+                  <div className="flex items-center gap-2">
+                    <CardTitle className="text-base font-semibold">
+                      {t("dayLabel", { day: day.day_number })}
+                    </CardTitle>
+                    {activityDurationOverloadedDays.has(day.day_number) && (
+                      <span
+                        className="text-xs text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1"
+                        title={t("dayActivityDurationOverloaded")}
+                      >
+                        ! {t("dayActivityDurationOverloaded")}
+                      </span>
+                    )}
+                  </div>
                   <p className="text-sm text-muted-foreground mt-1">{formattedDate}</p>
                   <div className="flex items-center gap-2 mt-1">
                     <p className="text-xs text-muted-foreground">
@@ -71,6 +88,22 @@ export function ExpandableView({
                       onSave={setDayTransportMode}
                       onApplyAll={setAllDaysTransportMode}
                     />
+                    {onOptimizeDay !== null && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 text-xs"
+                        disabled={optimizingDays.has(day.day_number)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onOptimizeDay(day.day_number);
+                        }}
+                      >
+                        {optimizingDays.has(day.day_number)
+                          ? t("optimizingRoute")
+                          : t("optimizeDayRoute")}
+                      </Button>
+                    )}
                   </div>
                 </div>
                 <svg
@@ -94,6 +127,7 @@ export function ExpandableView({
               <CardContent className="p-4 pt-0">
                 <DayActivitiesList
                   day={day}
+                  dayDate={calculateDayDate(itinerary.start_date, day.day_number)}
                   draggingActivityId={draggingActivityId}
                   crossDayDragInfo={crossDayDragInfo}
                   onActivityHover={onActivityHover}

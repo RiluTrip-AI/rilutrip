@@ -6,6 +6,7 @@
 export const CREDIT_COSTS = {
   GENERATE_ITINERARY: 100,
   CHAT: 10,
+  OPTIMIZE_ROUTE: 2,
 } as const;
 
 export type CreditAction = keyof typeof CREDIT_COSTS;

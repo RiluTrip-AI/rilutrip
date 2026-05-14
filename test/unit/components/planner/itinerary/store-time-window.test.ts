@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import type { Itinerary } from "@/types/itinerary";
+import type { Itinerary, Activity } from "@/types/itinerary";
 
 const mocks = vi.hoisted(() => ({
   updateItinerary: vi.fn(),
@@ -25,6 +25,16 @@ vi.mock("@/lib/places/resolution-service", () => ({
 }));
 
 import { useItineraryStore } from "@/components/planner/itinerary/store";
+
+const makeActivity = (id: string, order: number, time: string): Activity => ({
+  id,
+  title: `Activity ${id}`,
+  note: "",
+  time,
+  duration_minutes: 60,
+  order,
+  location: { name: `Place ${id}`, lat: 25.0 + order * 0.01, lng: 121.5 + order * 0.01 },
+});
 
 const baseItinerary: Itinerary = {
   id: "itin-1",
@@ -127,5 +137,77 @@ describe("store - setAllDaysTimeWindow", () => {
     useItineraryStore.setState({ itinerary: null });
     await useItineraryStore.getState().setAllDaysTimeWindow("09:00", "20:00");
     expect(mocks.updateItinerary).not.toHaveBeenCalled();
+  });
+});
+
+describe("store - getActivityDurationOverloadedDays", () => {
+  beforeEach(() => {
+    mocks.updateItinerary.mockReset();
+  });
+
+  it("returns empty set when itinerary is null", () => {
+    useItineraryStore.setState({ itinerary: null });
+    expect(useItineraryStore.getState().getActivityDurationOverloadedDays().size).toBe(0);
+  });
+
+  it("returns empty set when no day is overloaded", () => {
+    const itinerary: Itinerary = {
+      ...baseItinerary,
+      days: [
+        {
+          day_number: 1,
+          start_time: "09:00",
+          end_time: "21:00",
+          activities: [makeActivity("a", 0, "09:00"), makeActivity("b", 1, "10:00")],
+        },
+      ],
+    };
+    setupStore(itinerary);
+    expect(useItineraryStore.getState().getActivityDurationOverloadedDays().size).toBe(0);
+  });
+
+  it("returns day numbers whose total duration meets or exceeds the window", () => {
+    const itinerary: Itinerary = {
+      ...baseItinerary,
+      days: [
+        {
+          day_number: 1,
+          start_time: "09:00",
+          end_time: "10:00",
+          activities: [makeActivity("a", 0, "09:00"), makeActivity("b", 1, "09:30")],
+        },
+        {
+          day_number: 2,
+          start_time: "09:00",
+          end_time: "21:00",
+          activities: [makeActivity("c", 0, "09:00")],
+        },
+      ],
+    };
+    setupStore(itinerary);
+
+    const overloadedDays = useItineraryStore.getState().getActivityDurationOverloadedDays();
+
+    expect(overloadedDays.has(1)).toBe(true);
+    expect(overloadedDays.has(2)).toBe(false);
+  });
+
+  it("treats total duration equal to the window as overloaded", () => {
+    const itinerary: Itinerary = {
+      ...baseItinerary,
+      days: [
+        {
+          day_number: 1,
+          start_time: "09:00",
+          end_time: "10:00",
+          activities: [makeActivity("a", 0, "09:00")],
+        },
+      ],
+    };
+    setupStore(itinerary);
+
+    const overloadedDays = useItineraryStore.getState().getActivityDurationOverloadedDays();
+
+    expect(overloadedDays.has(1)).toBe(true);
   });
 });

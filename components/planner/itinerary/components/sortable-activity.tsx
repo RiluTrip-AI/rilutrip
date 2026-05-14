@@ -11,15 +11,18 @@ import { CSS } from "@dnd-kit/utilities";
 import { ActivityCard } from "./activity-card";
 import { useItineraryPermission } from "@/hooks/use-itinerary-permission";
 import type { SortableActivityProps } from "../types";
+import { useItineraryStore } from "../store";
 
 export function SortableActivity({
   activity,
   dayNumber,
+  dayDate,
   onActivityHover,
   onActivityClick,
   disableAnimation,
 }: SortableActivityProps) {
   const { canEdit } = useItineraryPermission();
+  const optimizeWarning = useItineraryStore((s) => s.optimizeWarnings.get(activity.id));
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: activity.id,
     disabled: !canEdit,
@@ -52,6 +55,8 @@ export function SortableActivity({
     >
       <ActivityCard
         activity={activity}
+        dayDate={dayDate}
+        optimizeWarning={optimizeWarning}
         className={`mb-3 transition-all border-b-4 border-r-4 border-b-primary/40 border-r-primary/40 hover:border-b-primary hover:border-r-primary ${
           isDragging
             ? "shadow-2xl cursor-grabbing"

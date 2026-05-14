@@ -7,6 +7,7 @@ const supabase = createSupabaseAdminClient();
 export interface PlaceInput {
   id: string;
   name: string;
+  place_id?: string;
   lat?: number;
   lng?: number;
 }
@@ -237,6 +238,35 @@ async function resolvePlace(input: PlaceInput): Promise<ResolvedPlace> {
   const base: ResolvedPlace = { id: input.id, name: input.name };
 
   if (input.lat === undefined || input.lng === undefined) {
+    if (input.place_id) {
+      const cached = await checkPlaceCache(input.place_id);
+      if (cached) {
+        return {
+          id: input.id,
+          ...normalizeCachedPlace(cached, input.name),
+          place_id: input.place_id,
+        };
+      }
+
+      const details = await getPlaceDetails(input.place_id);
+      if (details) {
+        const displayName = (details.displayName as Record<string, string>)?.text;
+        const location = details.location as Record<string, number>;
+        const data = {
+          place_id: input.place_id,
+          name: displayName ?? input.name,
+          lat: location?.latitude,
+          lng: location?.longitude,
+          rating: (details.rating as number) ?? undefined,
+          user_ratings_total: (details.userRatingCount as number) ?? undefined,
+          website: (details.websiteUri as string) ?? undefined,
+          opening_hours: (details.regularOpeningHours as Record<string, unknown>) ?? undefined,
+        };
+        await savePlaceCache(data);
+        return { id: input.id, ...data };
+      }
+    }
+
     const cachedByName = await checkPlaceCacheByName(input.name);
     if (cachedByName) {
       return {

@@ -33,9 +33,16 @@ import {
 } from "./itinerary";
 import type { ItineraryPanelProps, ViewMode } from "./itinerary";
 import { useItineraryPermission } from "@/hooks/use-itinerary-permission";
-import { useItineraryStore } from "./itinerary/store";
+import { useItineraryStore, OptimizeError, type OptimizeErrorKind } from "./itinerary/store";
 import { useGlobalAddModeTracking } from "./itinerary/hooks/use-global-add-mode-tracking";
+import { useAuth } from "@/lib/auth/auth-context";
+import { useProfile } from "@/hooks/use-profile";
 import { toast } from "sonner";
+
+const OPTIMIZE_ERROR_I18N: Record<OptimizeErrorKind, string> = {
+  INSUFFICIENT_CREDITS: "errorOptimizeInsufficientCredits",
+  GENERIC: "errorOptimizeFailed",
+};
 
 export function ItineraryPanel({
   onFullscreenChange,
@@ -49,9 +56,12 @@ export function ItineraryPanel({
   const t = useTranslations("planner");
   const tShare = useTranslations("share");
   const { canEdit, isReadOnly } = useItineraryPermission();
+  const { session } = useAuth();
+  const { refreshProfile } = useProfile();
   // Store state
   const committedItinerary = useItineraryStore((state) => state.itinerary);
   const previewItinerary = useItineraryStore((state) => state.previewItinerary);
+  const access = useItineraryStore((state) => state.access);
 
   const itinerary = previewItinerary ?? committedItinerary;
 
@@ -75,6 +85,17 @@ export function ItineraryPanel({
   const setAllDaysTimeWindow = useItineraryStore((state) => state.setAllDaysTimeWindow);
   const setDayTransportMode = useItineraryStore((state) => state.setDayTransportMode);
   const setAllDaysTransportMode = useItineraryStore((state) => state.setAllDaysTransportMode);
+  const optimizeDayRoutes = useItineraryStore((state) => state.optimizeDayRoutes);
+  const getActivityDurationOverloadedDays = useItineraryStore(
+    (state) => state.getActivityDurationOverloadedDays,
+  );
+  const optimizingDays = useItineraryStore((state) => state.optimizingDays);
+  const activityDurationOverloadedDays = getActivityDurationOverloadedDays();
+  const canOptimizeRoute =
+    canEdit &&
+    (Boolean(session?.access_token) ||
+      access.source === "owner" ||
+      access.source === "email_share");
 
   // Global mouse tracking for add activity mode
   useGlobalAddModeTracking();
@@ -178,6 +199,19 @@ export function ItineraryPanel({
     }
   };
 
+  const handleOptimizeDay = async (dayNumber: number) => {
+    try {
+      await optimizeDayRoutes([dayNumber]);
+      refreshProfile().catch((err) => {
+        console.error("Failed to refresh profile after route optimization:", err);
+      });
+    } catch (err) {
+      const key =
+        err instanceof OptimizeError ? OPTIMIZE_ERROR_I18N[err.kind] : "errorOptimizeFailed";
+      toast.error(t(key));
+    }
+  };
+
   const handleDragCancel = () => {
     discardPreview();
     resetDragState();
@@ -211,6 +245,9 @@ export function ItineraryPanel({
         setAllDaysTimeWindow={canEdit ? setAllDaysTimeWindow : undefined}
         setDayTransportMode={canEdit ? setDayTransportMode : undefined}
         setAllDaysTransportMode={canEdit ? setAllDaysTransportMode : undefined}
+        activityDurationOverloadedDays={activityDurationOverloadedDays}
+        optimizingDays={optimizingDays}
+        onOptimizeDay={canOptimizeRoute ? handleOptimizeDay : null}
       />
     ),
     "single-day": () => (
@@ -227,6 +264,9 @@ export function ItineraryPanel({
         setAllDaysTimeWindow={canEdit ? setAllDaysTimeWindow : undefined}
         setDayTransportMode={canEdit ? setDayTransportMode : undefined}
         setAllDaysTransportMode={canEdit ? setAllDaysTransportMode : undefined}
+        activityDurationOverloadedDays={activityDurationOverloadedDays}
+        optimizingDays={optimizingDays}
+        onOptimizeDay={canOptimizeRoute ? handleOptimizeDay : null}
       />
     ),
     "side-by-side": () => (
@@ -241,6 +281,9 @@ export function ItineraryPanel({
         setAllDaysTimeWindow={canEdit ? setAllDaysTimeWindow : undefined}
         setDayTransportMode={canEdit ? setDayTransportMode : undefined}
         setAllDaysTransportMode={canEdit ? setAllDaysTransportMode : undefined}
+        activityDurationOverloadedDays={activityDurationOverloadedDays}
+        optimizingDays={optimizingDays}
+        onOptimizeDay={canOptimizeRoute ? handleOptimizeDay : null}
       />
     ),
   };

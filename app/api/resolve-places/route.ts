@@ -15,6 +15,7 @@ const MAX_RESOLVE_PLACES = 10;
 const PlaceInputSchema = z.object({
   id: z.string(),
   name: z.string().min(1),
+  place_id: z.string().optional(),
   lat: z.number().optional(),
   lng: z.number().optional(),
 });

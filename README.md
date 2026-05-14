@@ -12,6 +12,13 @@ An AI-powered travel planning web application built with Next.js 15, React, Supa
 - 🌓 Dark/Light theme support
 - 🔐 Secure authentication with Google OAuth
 
+### Route Optimization
+
+- Optimizes itinerary day order with cached Google Routes API Compute Route Matrix data.
+- Uses ORS Vroom when `ORS_API_KEY` is available, then falls back to the local greedy optimizer.
+- Preserves activity time windows from opening hours, meal windows, and daily start/end settings.
+- Applies authenticated credit capture, per-user rate limiting, and trusted `day_matrices` cache writes in the `optimize-route` Supabase Edge Function.
+
 ## Tech Stack
 
 ### Frontend
@@ -25,7 +32,7 @@ An AI-powered travel planning web application built with Next.js 15, React, Supa
 ### Backend
 
 - **Supabase** - PostgreSQL database, authentication, and real-time features
-- **Supabase Edge Functions** - Serverless functions for AI integration
+- **Supabase Edge Functions** - Serverless functions for AI integration and route optimization
 - **Google Gemini 2.0 Flash** - AI model for itinerary generation
 
 ### Collaboration
@@ -74,6 +81,12 @@ Edit `.env.local` and add your API keys:
 - `NEXT_PUBLIC_SUPABASE_URL` - Your Supabase project URL
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Your Supabase anonymous key
 - `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` - Your Google Maps API key (domain-restricted)
+
+Server-side secrets are stored in Supabase Edge Function environment (configure in the Supabase dashboard under Edge Functions secrets):
+
+- `GEMINI_API_KEY` - Used by `generate-itinerary` and `chat`
+- `GOOGLE_MAPS_API_KEY` - Server-side Google Maps key for Places resolution and Routes API Compute Route Matrix in the `optimize-route` Edge Function
+- `ORS_API_KEY` - OpenRouteService API key for the `optimize-route` Edge Function; it falls back to the local greedy optimizer when omitted
 
 4. Run the development server:
 

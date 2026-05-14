@@ -4,61 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
+import { TimeSelect } from "@/components/ui/time-select";
 
 interface DayTimePickerProps {
   dayNumber: number;
-  startTime: string | null | undefined;
-  endTime: string | null | undefined;
+  startTime: string;
+  endTime: string;
   onSave?: (dayNumber: number, start: string, end: string) => Promise<void>;
   onApplyAll?: (start: string, end: string) => Promise<void>;
-}
-
-const DEFAULT_START_TIME = "09:00";
-const DEFAULT_END_TIME = "20:00";
-
-const HOURS = Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, "0"));
-const MINUTES = ["00", "15", "30", "45"];
-
-function snapMinute(mm: string): string {
-  if (MINUTES.includes(mm)) return mm;
-  const m = parseInt(mm, 10);
-  return MINUTES.reduce((best, opt) =>
-    Math.abs(parseInt(opt) - m) < Math.abs(parseInt(best) - m) ? opt : best,
-  );
-}
-
-function TimeSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const [rawHH, rawMM] = value.split(":");
-  const hh = HOURS.includes(rawHH) ? rawHH : "09";
-  const mm = snapMinute(rawMM ?? "00");
-
-  return (
-    <div className="flex items-center gap-0.5">
-      <select
-        value={hh}
-        onChange={(e) => onChange(`${e.target.value}:${mm}`)}
-        className="bg-background border border-border rounded px-1 h-7 text-xs text-center w-11 cursor-pointer"
-      >
-        {HOURS.map((h) => (
-          <option key={h} value={h}>
-            {h}
-          </option>
-        ))}
-      </select>
-      <span className="text-muted-foreground text-xs">:</span>
-      <select
-        value={mm}
-        onChange={(e) => onChange(`${hh}:${e.target.value}`)}
-        className="bg-background border border-border rounded px-1 h-7 text-xs text-center w-11 cursor-pointer"
-      >
-        {MINUTES.map((m) => (
-          <option key={m} value={m}>
-            {m}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
 }
 
 export function DayTimePicker({
@@ -68,8 +21,8 @@ export function DayTimePicker({
   onSave,
   onApplyAll,
 }: DayTimePickerProps) {
-  const [localStartTime, setLocalStartTime] = useState(startTime ?? DEFAULT_START_TIME);
-  const [localEndTime, setLocalEndTime] = useState(endTime ?? DEFAULT_END_TIME);
+  const [localStartTime, setLocalStartTime] = useState(startTime);
+  const [localEndTime, setLocalEndTime] = useState(endTime);
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState({ startTime: localStartTime, endTime: localEndTime });
   const [saving, setSaving] = useState(false);
@@ -82,8 +35,8 @@ export function DayTimePicker({
   const isEditable = !!(onSave && onApplyAll);
 
   useEffect(() => {
-    setLocalStartTime(startTime ?? DEFAULT_START_TIME);
-    setLocalEndTime(endTime ?? DEFAULT_END_TIME);
+    setLocalStartTime(startTime);
+    setLocalEndTime(endTime);
   }, [startTime, endTime]);
 
   useEffect(() => {
@@ -202,11 +155,13 @@ export function DayTimePicker({
             <p className="text-xs font-medium mb-2">{t("title", { dayNumber })}</p>
             <div className="flex items-center gap-2 mb-3">
               <TimeSelect
+                size="sm"
                 value={draft.startTime}
                 onChange={(v) => setDraft((d) => ({ ...d, startTime: v }))}
               />
-              <span className="text-xs text-muted-foreground shrink-0">–</span>
+              <span className="text-xs text-muted-foreground shrink-0">-</span>
               <TimeSelect
+                size="sm"
                 value={draft.endTime}
                 onChange={(v) => setDraft((d) => ({ ...d, endTime: v }))}
               />

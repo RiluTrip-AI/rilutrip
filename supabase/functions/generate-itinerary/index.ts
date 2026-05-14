@@ -7,6 +7,7 @@ import { captureCredits, refundCredits } from "../_shared/credits.ts";
 import { createSupabaseAdminClient, createSupabaseClient } from "../_shared/supabase.ts";
 
 import { z } from "npm:zod";
+import { type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { resolvePlacesInfo } from "../_shared/place-resolver.ts";
 
 const GenerateRequestSchema = z.object({
@@ -169,6 +170,22 @@ async function optimizeGeneratedItinerary(input: {
     console.error("Auto route optimization failed:", err);
     return input.days;
   }
+}
+
+async function finalizeGeneratedItinerary(
+  supabaseAdmin: SupabaseClient,
+  itineraryId: string,
+  days: GeneratedDay[],
+): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from("itineraries")
+    .update({
+      status: "completed",
+      data: { days },
+    })
+    .eq("id", itineraryId);
+
+  if (error) throw error;
 }
 
 Deno.serve(async (req) => {
@@ -494,11 +511,11 @@ Deno.serve(async (req) => {
           const skipCreditCaptureToken = crypto.randomUUID();
           const internalOptimizationTokenHash = await sha256Hex(skipCreditCaptureToken);
 
-          // Save complete itinerary to DB
+          // Save generated days and the temporary internal optimization token,
+          // but keep status as generating until auto optimization finishes.
           const { error: updateError } = await supabaseAdmin
             .from("itineraries")
             .update({
-              status: "completed",
               data: {
                 days: allDays,
                 internal_optimization_token_hash: internalOptimizationTokenHash,
@@ -511,24 +528,25 @@ Deno.serve(async (req) => {
             throw updateError;
           }
 
-          allDays = await optimizeGeneratedItinerary({
-            itineraryId: itinerary_id,
-            startDate,
-            days: allDays as GeneratedDay[],
-            authHeader: req.headers.get("Authorization")!,
-            skipCreditCaptureToken,
-          });
-
-          const { error: optimizedUpdateError } = await supabaseAdmin
-            .from("itineraries")
-            .update({
-              data: { days: allDays },
-            })
-            .eq("id", itinerary_id);
-
-          if (optimizedUpdateError) {
-            console.error("Failed to save optimized itinerary to DB:", optimizedUpdateError);
-            throw optimizedUpdateError;
+          try {
+            allDays = await optimizeGeneratedItinerary({
+              itineraryId: itinerary_id,
+              startDate,
+              days: allDays as GeneratedDay[],
+              authHeader: req.headers.get("Authorization")!,
+              skipCreditCaptureToken,
+            });
+          } finally {
+            try {
+              await finalizeGeneratedItinerary(
+                supabaseAdmin,
+                itinerary_id,
+                allDays as GeneratedDay[],
+              );
+            } catch (finalizeError) {
+              console.error("Failed to finalize generated itinerary:", finalizeError);
+              throw finalizeError;
+            }
           }
           captured = false;
 

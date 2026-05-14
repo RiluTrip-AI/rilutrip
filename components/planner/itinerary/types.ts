@@ -2,7 +2,7 @@
  * Type definitions for Itinerary Panel components
  */
 
-import type { Itinerary, Activity, Day, TransportMode } from "@/types/itinerary";
+import type { Itinerary, Activity, Day, OptimizeWarning, TransportMode } from "@/types/itinerary";
 
 export type ViewMode = "expandable" | "single-day" | "side-by-side";
 
@@ -13,6 +13,7 @@ export interface DroppableDayProps {
 
 export interface DayActivitiesListProps {
   day: Day;
+  dayDate: string;
   draggingActivityId: string | null;
   crossDayDragInfo: { sourceDayNumber: number; targetDayNumber: number } | null;
   onActivityHover?: (activityId: string | null) => void;
@@ -21,7 +22,9 @@ export interface DayActivitiesListProps {
 
 export interface ActivityCardProps {
   activity: Activity;
+  dayDate?: string;
   className?: string;
+  optimizeWarning?: OptimizeWarning;
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
   onClick?: () => void;
@@ -30,6 +33,7 @@ export interface ActivityCardProps {
 export interface SortableActivityProps {
   activity: Activity;
   dayNumber: number;
+  dayDate: string;
   onActivityHover?: (activityId: string | null) => void;
   onActivityClick?: (activityId: string) => void;
   disableAnimation?: boolean;
@@ -71,6 +75,9 @@ export interface ExpandableViewProps {
   setAllDaysTimeWindow?: (startTime: string, endTime: string) => Promise<void>;
   setDayTransportMode?: (dayNumber: number, mode: TransportMode) => Promise<void>;
   setAllDaysTransportMode?: (mode: TransportMode) => Promise<void>;
+  activityDurationOverloadedDays: Set<number>;
+  optimizingDays: Set<number>;
+  onOptimizeDay: ((dayNumber: number) => void) | null;
 }
 
 export interface SingleDayViewProps {
@@ -86,6 +93,9 @@ export interface SingleDayViewProps {
   setAllDaysTimeWindow?: (startTime: string, endTime: string) => Promise<void>;
   setDayTransportMode?: (dayNumber: number, mode: TransportMode) => Promise<void>;
   setAllDaysTransportMode?: (mode: TransportMode) => Promise<void>;
+  activityDurationOverloadedDays: Set<number>;
+  optimizingDays: Set<number>;
+  onOptimizeDay: ((dayNumber: number) => void) | null;
 }
 
 export interface SideBySideViewProps {
@@ -99,4 +109,7 @@ export interface SideBySideViewProps {
   setAllDaysTimeWindow?: (startTime: string, endTime: string) => Promise<void>;
   setDayTransportMode?: (dayNumber: number, mode: TransportMode) => Promise<void>;
   setAllDaysTransportMode?: (mode: TransportMode) => Promise<void>;
+  activityDurationOverloadedDays: Set<number>;
+  optimizingDays: Set<number>;
+  onOptimizeDay: ((dayNumber: number) => void) | null;
 }

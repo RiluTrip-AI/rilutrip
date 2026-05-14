@@ -7,25 +7,96 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ExternalLink, Pencil, MapPin, Star, MapPinOff } from "lucide-react";
+import { AlertTriangle, Clock, ExternalLink, Pencil, MapPin, Star, MapPinOff } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import type { ActivityCardProps } from "../types";
 import { createDirectionsLink, createPlaceSearchLink } from "@/lib/maps/utils";
 import { hasValidCoordinates } from "@/lib/utils/geo";
+import { parseLocalDate } from "@/lib/utils/date";
 import { EditActivityDialog } from "./edit-activity-dialog";
 import { useItineraryPermission } from "@/hooks/use-itinerary-permission";
 
+function parseTimeToMinutes(time: string): number {
+  const [hours, minutes] = time.split(":").map(Number);
+  return hours * 60 + minutes;
+}
+
+function formatMinutesAsTime(minutes: number): string {
+  const clamped = Math.max(0, Math.min(24 * 60, minutes));
+  if (clamped === 24 * 60) return "00:00";
+  const hours = Math.floor(clamped / 60);
+  const mins = clamped % 60;
+  return `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
+}
+
+function getOpeningHoursConstraint(
+  activity: ActivityCardProps["activity"],
+): { latestStart: string; close: string } | { availableMinutes: number } | null {
+  if (!activity.opening_hours) return null;
+
+  const openMinutes = parseTimeToMinutes(activity.opening_hours.open);
+  const rawCloseMinutes = parseTimeToMinutes(activity.opening_hours.close);
+  const closeMinutes =
+    rawCloseMinutes === 0 || rawCloseMinutes < openMinutes ? 24 * 60 : rawCloseMinutes;
+  const latestStartMinutes = closeMinutes - activity.duration_minutes;
+
+  if (latestStartMinutes < openMinutes) {
+    return { availableMinutes: Math.max(0, closeMinutes - openMinutes) };
+  }
+
+  return {
+    latestStart: formatMinutesAsTime(latestStartMinutes),
+    close: formatMinutesAsTime(closeMinutes),
+  };
+}
+
+function stripWeekdayPrefix(description: string): string {
+  const separatorIndex = description.indexOf(":");
+  if (separatorIndex === -1) return description;
+  return description.slice(separatorIndex + 1).trim();
+}
+
+function getOpeningHoursDisplay(
+  activity: ActivityCardProps["activity"],
+  dayDate?: string,
+): string | null {
+  if (activity.opening_hours) {
+    return `${activity.opening_hours.open}-${activity.opening_hours.close}`;
+  }
+
+  const weekdayDescriptions = activity.location.opening_hours?.weekdayDescriptions;
+  if (
+    Array.isArray(weekdayDescriptions) &&
+    weekdayDescriptions.every(
+      (description): description is string => typeof description === "string",
+    )
+  ) {
+    if (!dayDate) return null;
+    const dayIndex = (parseLocalDate(dayDate).getDay() + 6) % 7;
+    const description = weekdayDescriptions[dayIndex];
+    return description ? stripWeekdayPrefix(description) : null;
+  }
+
+  return null;
+}
+
 export function ActivityCard({
   activity,
+  dayDate,
   className,
+  optimizeWarning,
   onMouseEnter,
   onMouseLeave,
   onClick,
 }: ActivityCardProps) {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const { canEdit } = useItineraryPermission();
+  const tWarnings = useTranslations("planner.routeWarnings");
+  const openingHoursConstraint = getOpeningHoursConstraint(activity);
+  const openingHoursDisplay = getOpeningHoursDisplay(activity, dayDate);
 
   const handleNavigationConfig = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -81,7 +152,7 @@ export function ActivityCard({
         <div className="flex items-start gap-3">
           {/* Time Badge */}
           <div className="flex-shrink-0 px-2 py-1 bg-primary/10 rounded text-xs font-medium text-primary">
-            {activity.time}
+            {optimizeWarning ? tWarnings("unscheduledTime") : activity.time}
           </div>
 
           <div className="flex-1 min-w-0 pr-6">
@@ -147,6 +218,44 @@ export function ActivityCard({
                 <span>{activity.duration_minutes} min</span>
               </div>
             </div>
+
+            <div className="mt-1 flex items-start gap-1 text-[11px] leading-snug text-muted-foreground">
+              <Clock className="mt-0.5 h-3 w-3 flex-shrink-0" />
+              <span
+                className={cn("line-clamp-2", !openingHoursDisplay && "text-muted-foreground/70")}
+              >
+                {openingHoursDisplay
+                  ? tWarnings("openingHoursLabel", { hours: openingHoursDisplay })
+                  : tWarnings("openingHoursUnknown")}
+              </span>
+            </div>
+
+            {optimizeWarning?.code === "ACTIVITY_WINDOW_TOO_SHORT" && (
+              <div className="mt-2 flex items-start gap-1.5 rounded border border-amber-200 bg-amber-50 px-2 py-1.5 text-[11px] leading-snug text-amber-800 dark:border-amber-500/40 dark:bg-amber-950/30 dark:text-amber-300">
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
+                <span>
+                  {tWarnings("openingWindowTooShort", {
+                    availableMinutes: optimizeWarning.availableMinutes,
+                    durationMinutes: optimizeWarning.durationMinutes,
+                  })}
+                </span>
+              </div>
+            )}
+
+            {optimizeWarning?.code === "ACTIVITY_UNASSIGNED_BY_ROUTE_CONSTRAINTS" && (
+              <div className="mt-2 flex items-start gap-1.5 rounded border border-amber-200 bg-amber-50 px-2 py-1.5 text-[11px] leading-snug text-amber-800 dark:border-amber-500/40 dark:bg-amber-950/30 dark:text-amber-300">
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
+                <span>
+                  {openingHoursConstraint && "latestStart" in openingHoursConstraint
+                    ? tWarnings("openingHoursMissed", openingHoursConstraint)
+                    : optimizeWarning.reason === "DAY_END"
+                      ? tWarnings("dayEndExceeded", {
+                          dayEndTime: optimizeWarning.dayEndTime ?? tWarnings("dayEndFallback"),
+                        })
+                      : tWarnings("routeConstraints")}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </CardContent>
