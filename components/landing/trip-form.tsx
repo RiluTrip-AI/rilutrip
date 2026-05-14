@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { TimeSelect } from "@/components/ui/time-select";
 import { TrendingDestinations } from "./trending-destinations";
 import { DateRangePicker } from "./date-range-picker";
 import { LoginDialog } from "@/components/auth/login-dialog";
@@ -15,27 +16,29 @@ import { createItineraryMetadata, ItineraryLimitError } from "@/lib/supabase/iti
 import { formatLocalDate } from "@/lib/utils/date";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { MapPin } from "lucide-react";
 import { useForm, Controller } from "react-hook-form";
 import { createTripFormSchema, type TripFormValues } from "@/types/forms";
+import { DEFAULT_TRIP_SETTINGS } from "@/types/itinerary";
 
 export function TripForm() {
   const t = useTranslations("landing.form");
   const tv = useTranslations();
   const ti = useTranslations("itineraries");
+  const tp = useTranslations("planner");
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
   const [generalError, setGeneralError] = useState<string>();
-
   const form = useForm<TripFormValues>({
     resolver: zodResolver(createTripFormSchema((key) => tv(key))),
     defaultValues: {
       destination: "",
       preferences: "",
-      dates: {
-        from: undefined,
-        to: undefined,
-      },
+      dates: { from: undefined, to: undefined },
+      startTime: DEFAULT_TRIP_SETTINGS.startTime,
+      endTime: DEFAULT_TRIP_SETTINGS.endTime,
+      transportMode: DEFAULT_TRIP_SETTINGS.transportMode,
     },
   });
 
@@ -64,6 +67,11 @@ export function TripForm() {
         start_date: formattedStart,
         end_date: formattedEnd,
         preferences: data.preferences?.trim() || undefined,
+        settings: {
+          startTime: data.startTime,
+          endTime: data.endTime,
+          transportMode: data.transportMode,
+        },
       });
 
       router.push(`/plan/${itinerary.id}`);
@@ -98,7 +106,7 @@ export function TripForm() {
                 </label>
                 <div className="relative">
                   <span className="absolute left-3 top-5 -translate-y-1/2 text-muted-foreground">
-                    📍
+                    <MapPin className="h-4 w-4" aria-hidden="true" />
                   </span>
                   <Input
                     id="destination"
@@ -153,6 +161,65 @@ export function TripForm() {
                 error={!!form.formState.errors.preferences}
                 helperText={form.formState.errors.preferences?.message?.toString()}
               />
+            </div>
+
+            {/* Trip Preferences: time window + transport mode */}
+            <div className="flex flex-wrap gap-4 items-end">
+              <div>
+                <label className="block text-sm font-medium mb-2 text-foreground/80">
+                  {t("dailyTimeRange")}
+                  <span className="ml-1 text-xs text-muted-foreground">{t("optional")}</span>
+                </label>
+                <div className="flex items-center gap-2">
+                  <Controller
+                    name="startTime"
+                    control={form.control}
+                    render={({ field }) => (
+                      <TimeSelect value={field.value} onChange={field.onChange} />
+                    )}
+                  />
+                  <span className="text-sm text-muted-foreground">-</span>
+                  <Controller
+                    name="endTime"
+                    control={form.control}
+                    render={({ field }) => (
+                      <TimeSelect value={field.value} onChange={field.onChange} />
+                    )}
+                  />
+                </div>
+                {form.formState.errors.endTime && (
+                  <p className="text-xs text-destructive mt-1">
+                    {form.formState.errors.endTime.message}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2 text-foreground/80">
+                  {t("transportMode")}
+                  <span className="ml-1 text-xs text-muted-foreground">{t("optional")}</span>
+                </label>
+                <Controller
+                  name="transportMode"
+                  control={form.control}
+                  render={({ field }) => (
+                    <select
+                      value={field.value}
+                      onChange={(e) =>
+                        field.onChange(
+                          e.target.value as "driving" | "walking" | "transit" | "bicycling",
+                        )
+                      }
+                      className="bg-background border border-border rounded px-3 h-8 text-sm cursor-pointer"
+                    >
+                      <option value="driving">{tp("transportMode.driving")}</option>
+                      <option value="walking">{tp("transportMode.walking")}</option>
+                      <option value="transit">{tp("transportMode.transit")}</option>
+                      <option value="bicycling">{tp("transportMode.bicycling")}</option>
+                    </select>
+                  )}
+                />
+              </div>
             </div>
 
             {/* General Error Message */}

@@ -9,7 +9,13 @@
 
 import { supabase } from "./client";
 import type { PostgrestError } from "@supabase/supabase-js";
-import type { Itinerary } from "@/types/itinerary";
+import {
+  DaySchema,
+  TripSettingsSchema,
+  type Day,
+  type Itinerary,
+  type TripSettings,
+} from "@/types/itinerary";
 import type { AccessContext } from "@/types/share";
 import type { Database } from "./database.types";
 
@@ -53,7 +59,9 @@ function isItineraryLimitPostgrestError(error: PostgrestError): boolean {
  * Convert database row to Itinerary type
  */
 function rowToItinerary(row: ItineraryRow): Itinerary {
-  const data = row.data as unknown as { days?: Itinerary["days"] } | null;
+  const data = row.data as unknown as { days?: unknown } | null;
+  const settings = TripSettingsSchema.parse(row.settings);
+  const days = parsePersistedDays(data?.days, settings);
 
   return {
     id: row.id,
@@ -64,11 +72,32 @@ function rowToItinerary(row: ItineraryRow): Itinerary {
     end_date: row.end_date,
     preferences: row.preferences || undefined,
     status: row.status as ItineraryStatus,
-    days: data?.days || [],
+    days,
+    settings,
     link_access: row.link_access,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
+}
+
+function parsePersistedDays(days: unknown, settings: TripSettings): Day[] {
+  if (days === undefined) return [];
+  if (!Array.isArray(days)) throw new Error("Itinerary days must be an array");
+
+  return days.map((day) => {
+    if (!day || typeof day !== "object" || Array.isArray(day)) {
+      throw new Error("Itinerary day must be an object");
+    }
+    const persistedDay = day as Record<string, unknown>;
+
+    return DaySchema.parse({
+      ...persistedDay,
+      start_time: "start_time" in persistedDay ? persistedDay.start_time : settings.startTime,
+      end_time: "end_time" in persistedDay ? persistedDay.end_time : settings.endTime,
+      transport_mode:
+        "transport_mode" in persistedDay ? persistedDay.transport_mode : settings.transportMode,
+    });
+  });
 }
 
 /**
@@ -142,6 +171,7 @@ export async function createItineraryMetadata(metadata: {
   start_date: string;
   end_date: string;
   preferences?: string;
+  settings: TripSettings;
 }): Promise<Itinerary> {
   const insertData: ItineraryInsert = {
     user_id: metadata.user_id,
@@ -150,6 +180,7 @@ export async function createItineraryMetadata(metadata: {
     start_date: metadata.start_date,
     end_date: metadata.end_date,
     preferences: metadata.preferences || null,
+    settings: metadata.settings as unknown as Json,
   };
 
   const { data, error } = await (supabase
@@ -254,9 +285,10 @@ function buildItineraryUpdate(
   }
 
   if (updates.days !== undefined) {
-    updateData.data = {
-      days: updates.days,
-    } as Json;
+    updateData.data = { days: updates.days } as Json;
+  }
+  if (updates.settings !== undefined) {
+    updateData.settings = updates.settings as unknown as Json;
   }
 
   return updateData;

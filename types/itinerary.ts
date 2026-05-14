@@ -22,6 +22,8 @@ export type Location = z.infer<typeof LocationSchema>;
 // Activity Types
 // ============================================================================
 
+const TimeHHMMSchema = z.string().regex(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/);
+
 export const ActivitySchema = z.object({
   id: z.uuid(),
   time: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Time must be in HH:MM format"),
@@ -30,9 +32,35 @@ export const ActivitySchema = z.object({
   location: LocationSchema,
   duration_minutes: z.number().int().min(1).max(480),
   order: z.number().int().min(0),
+  type: z.enum(["lunch", "dinner", "breakfast", "transit"]).optional(),
+  url: z.string().url().optional(),
+  opening_hours: z.object({ open: TimeHHMMSchema, close: TimeHHMMSchema }).optional(),
 });
 
 export type Activity = z.infer<typeof ActivitySchema>;
+
+export const OptimizeWarningSchema = z.discriminatedUnion("code", [
+  z.object({
+    code: z.literal("ACTIVITY_WINDOW_TOO_SHORT"),
+    dayNumber: z.number().int().positive(),
+    activityId: z.uuid(),
+    title: z.string(),
+    openingHours: z.object({ open: TimeHHMMSchema, close: TimeHHMMSchema }),
+    durationMinutes: z.number().int().positive(),
+    availableMinutes: z.number().int().min(0),
+  }),
+  z.object({
+    code: z.literal("ACTIVITY_UNASSIGNED_BY_ROUTE_CONSTRAINTS"),
+    dayNumber: z.number().int().positive(),
+    activityId: z.uuid(),
+    title: z.string(),
+    durationMinutes: z.number().int().positive(),
+    reason: z.enum(["DAY_END", "ROUTE_CONSTRAINTS"]).optional(),
+    dayEndTime: TimeHHMMSchema.optional(),
+  }),
+]);
+
+export type OptimizeWarning = z.infer<typeof OptimizeWarningSchema>;
 
 // Activity with day number (for components that need day association)
 export type ActivityWithDay = Activity & { dayNumber: number };
@@ -50,20 +78,31 @@ export const DaySchema = z
     activities: z.array(ActivitySchema),
     start_time: z
       .string()
-      .regex(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/, "Time must be in HH:MM format")
-      .optional(),
-    end_time: z
-      .string()
-      .regex(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/, "Time must be in HH:MM format")
-      .optional(),
-    transport_mode: TransportModeSchema.optional(),
+      .regex(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/, "Time must be in HH:MM format"),
+    end_time: z.string().regex(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/, "Time must be in HH:MM format"),
+    transport_mode: TransportModeSchema,
+    optimization_warnings: z.array(OptimizeWarningSchema).optional(),
   })
-  .refine((data) => !data.start_time || !data.end_time || data.start_time < data.end_time, {
+  .refine((data) => data.start_time < data.end_time, {
     message: "End time must be after start time",
     path: ["end_time"],
   });
 
 export type Day = z.infer<typeof DaySchema>;
+
+// ============================================================================
+// Trip Settings Types
+// ============================================================================
+
+export const TripSettingsSchema = z.object({
+  startTime: z.string().regex(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/),
+  endTime: z.string().regex(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/),
+  transportMode: TransportModeSchema,
+});
+
+export type TripSettings = z.infer<typeof TripSettingsSchema>;
+
+export { DEFAULT_TRIP_SETTINGS } from "@/shared/trip-settings";
 
 // ============================================================================
 // Itinerary Types
@@ -80,6 +119,7 @@ export const ItinerarySchema = z
     preferences: z.string().max(1000, "Preferences are too long").optional(),
     status: z.enum(["draft", "generating", "completed", "failed"]).optional(),
     days: z.array(DaySchema),
+    settings: TripSettingsSchema,
     link_access: LinkAccessSchema.default("none"),
     created_at: z.iso.datetime(),
     updated_at: z.iso.datetime(),

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TransportModeSchema } from "./itinerary";
 
 // ============================================================================
 // Schema Factory Types
@@ -23,6 +24,9 @@ export const createTripFormSchema = (t: TranslationFunction) =>
         to: z.date().optional(),
       }),
       preferences: z.string().max(1000, t("validation.preferencesMaxLength")).optional(),
+      startTime: z.string().regex(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/),
+      endTime: z.string().regex(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/),
+      transportMode: TransportModeSchema,
     })
     .superRefine((data, ctx) => {
       const { from, to } = data.dates;
@@ -73,6 +77,14 @@ export const createTripFormSchema = (t: TranslationFunction) =>
           code: "custom",
           message: t("validation.dateTooLong"),
           path: ["dates"],
+        });
+      }
+
+      if (data.startTime && data.endTime && data.startTime >= data.endTime) {
+        ctx.addIssue({
+          code: "custom",
+          message: t("validation.endTimeAfterStart"),
+          path: ["endTime"],
         });
       }
     });

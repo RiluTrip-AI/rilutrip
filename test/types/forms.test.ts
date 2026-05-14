@@ -3,6 +3,11 @@ import { createTripFormSchema, createActivityFormSchema } from "@/types/forms";
 
 describe("Form Schema Factories", () => {
   const mockT = (key: string) => `translated-${key}`;
+  const tripDefaults = {
+    startTime: "09:00",
+    endTime: "21:00",
+    transportMode: "driving" as const,
+  };
 
   describe("createTripFormSchema", () => {
     it("should return translated error for missing destination", () => {
@@ -10,6 +15,7 @@ describe("Form Schema Factories", () => {
       const result = schema.safeParse({
         destination: "",
         dates: { from: new Date(), to: new Date() },
+        ...tripDefaults,
       });
 
       expect(result.success).toBe(false);
@@ -23,6 +29,7 @@ describe("Form Schema Factories", () => {
       const result = schema.safeParse({
         destination: "Tokyo",
         dates: { from: undefined, to: undefined },
+        ...tripDefaults,
       });
 
       expect(result.success).toBe(false);
@@ -40,6 +47,7 @@ describe("Form Schema Factories", () => {
       const result = schema.safeParse({
         destination: "Tokyo",
         dates: { from: start, to: end },
+        ...tripDefaults,
       });
 
       expect(result.success).toBe(false);

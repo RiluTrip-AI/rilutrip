@@ -29,7 +29,8 @@
     "noteMaxLength": "Note must be at most 500 characters",
     "preferencesMaxLength": "Preferences must be at most 1000 characters",
     "pastDateNotAllowed": "Cannot select past dates",
-    "dateTooLong": "Trip duration cannot exceed 14 days"
+    "dateTooLong": "Trip duration cannot exceed 14 days",
+    "endTimeAfterStart": "End time must be after start time"
   },
   "landing": {
     "hero": {
@@ -48,7 +49,10 @@
       "itineraryLimitError": "You have reached your itinerary limit for the current plan.",
       "createError": "Failed to create itinerary. Please try again.",
       "perfectArrangeButton": "Perfect Arrangement",
-      "autoOptimizing": "Optimizing routes..."
+      "autoOptimizing": "Optimizing routes...",
+      "dailyTimeRange": "Daily time range",
+      "transportMode": "Transport mode",
+      "optional": "(optional)"
     },
     "trending": {
       "title": "Trending Destinations",
@@ -123,6 +127,23 @@
     "generationTimeout": "Generation timed out. Please try again.",
     "generating": "Generating your itinerary...",
     "errorUpdateDays": "Failed to update itinerary order. Please try again.",
+    "errorOptimizeInsufficientCredits": "Not enough credits to optimize this route.",
+    "errorOptimizeFailed": "Route optimization failed. Please try again.",
+    "dayActivityDurationOverloaded": "Activities exceed time window",
+    "optimizeDayRoute": "Optimize route",
+    "optimizingRoute": "Optimizing...",
+    "dayLabel": "Day {day}",
+    "routeWarnings": {
+      "unscheduledSection": "Unable to schedule",
+      "unscheduledTime": "Unscheduled",
+      "openingHoursLabel": "Opening hours: {hours}",
+      "openingHoursUnknown": "Opening hours unavailable",
+      "openingWindowTooShort": "Opening window is too short: {availableMinutes} min available, {durationMinutes} min needed",
+      "openingHoursMissed": "Must start by {latestStart} to finish before {close}",
+      "dayEndExceeded": "With travel and stay time, this cannot finish before {dayEndTime}",
+      "dayEndFallback": "the day ends",
+      "routeConstraints": "Cannot fit within the day time and opening-hour constraints"
+    },
     "transportMode": {
       "driving": "Driving",
       "walking": "Walking",

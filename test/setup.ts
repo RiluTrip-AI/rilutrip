@@ -100,6 +100,20 @@ vi.mock("next-intl", () => {
     "planner.dayTimeDisplay.applyAll": "Apply to all days",
     "planner.dayTimeDisplay.errorSave": "Failed to save time range. Please try again.",
     "planner.dayTimeDisplay.errorTimeRange": "Start time must be before end time.",
+    // Route optimization
+    "planner.dayActivityDurationOverloaded": "Activities exceed time window",
+    "planner.optimizeDayRoute": "Optimize route",
+    "planner.optimizingRoute": "Optimizing...",
+    "planner.dayLabel": "Day {day}",
+    "planner.routeWarnings.unscheduledTime": "Unscheduled",
+    "planner.routeWarnings.openingHoursLabel": "Opening hours: {hours}",
+    "planner.routeWarnings.openingHoursUnknown": "Opening hours unavailable",
+    "planner.routeWarnings.openingWindowTooShort":
+      "Opening window is too short: {availableMinutes} min available, {durationMinutes} min needed",
+    "planner.routeWarnings.unscheduledSection": "Unable to schedule",
+    // Transit
+    "transit.minutes": "min",
+    "transit.about": "~",
     // Landing form
     "landing.form.whereToNext": "whereToNext",
     "landing.form.destinationPlaceholder": "destinationPlaceholder",
@@ -128,6 +142,7 @@ vi.mock("next-intl", () => {
     NextIntlClientProvider: ({ children }: { children: React.ReactNode }) => children,
   };
 });
+
 // Mock next-intl/navigation if needed
 vi.mock("next-intl/navigation", () => ({
   useRouter: () => ({

@@ -4,10 +4,13 @@ import { DaySchema } from "@/types/itinerary";
 const baseDay = {
   day_number: 1,
   activities: [],
+  start_time: "09:00",
+  end_time: "21:00",
+  transport_mode: "driving" as const,
 };
 
 describe("DaySchema - start_time / end_time", () => {
-  it("passes without start_time / end_time (both optional)", () => {
+  it("passes with all required fields", () => {
     expect(() => DaySchema.parse(baseDay)).not.toThrow();
   });
 
@@ -43,6 +46,16 @@ describe("DaySchema - start_time / end_time", () => {
     expect(() => DaySchema.parse({ ...baseDay, start_time: "morning" })).toThrow();
   });
 
+  it("throws when start_time is missing", () => {
+    const { start_time: _, ...without } = baseDay;
+    expect(() => DaySchema.parse(without)).toThrow();
+  });
+
+  it("throws when end_time is missing", () => {
+    const { end_time: _, ...without } = baseDay;
+    expect(() => DaySchema.parse(without)).toThrow();
+  });
+
   it("parsed result includes start_time and end_time", () => {
     const result = DaySchema.parse({
       ...baseDay,
@@ -51,14 +64,6 @@ describe("DaySchema - start_time / end_time", () => {
     });
     expect(result.start_time).toBe("09:00");
     expect(result.end_time).toBe("20:00");
-  });
-
-  it("passes with only start_time and no end_time", () => {
-    expect(() => DaySchema.parse({ ...baseDay, start_time: "08:00" })).not.toThrow();
-  });
-
-  it("passes with only end_time and no start_time", () => {
-    expect(() => DaySchema.parse({ ...baseDay, end_time: "20:00" })).not.toThrow();
   });
 
   // Time range validation tests

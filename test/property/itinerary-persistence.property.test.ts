@@ -57,6 +57,11 @@ describe("Property 22: Itinerary Database Persistence", () => {
               data: {
                 days: itinerary.days,
               },
+              settings: {
+                startTime: "09:00",
+                endTime: "21:00",
+                transportMode: "driving",
+              },
               created_at: itinerary.created_at,
               updated_at: itinerary.updated_at,
             },
@@ -84,6 +89,56 @@ describe("Property 22: Itinerary Database Persistence", () => {
         expect(supabase.from).toHaveBeenCalledWith("itineraries");
       }),
       { numRuns: 100 },
+    );
+  });
+
+  it("loads persisted days with missing day settings from itinerary settings", async () => {
+    const itinerary = fc.sample(itineraryArbitrary, 1)[0];
+    const settings = {
+      startTime: "10:00",
+      endTime: "20:00",
+      transportMode: "walking" as const,
+    };
+    const persistedDays = itinerary.days.map((day) => {
+      const persistedDay: Record<string, unknown> = { ...day };
+      delete persistedDay.start_time;
+      delete persistedDay.end_time;
+      delete persistedDay.transport_mode;
+      return persistedDay;
+    });
+    const mockFrom = vi.fn(() => ({
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({
+        data: {
+          id: itinerary.id,
+          user_id: itinerary.user_id,
+          title: itinerary.title,
+          destination: itinerary.destination,
+          start_date: itinerary.start_date,
+          end_date: itinerary.end_date,
+          data: {
+            days: persistedDays,
+          },
+          settings,
+          created_at: itinerary.created_at,
+          updated_at: itinerary.updated_at,
+        },
+        error: null,
+      }),
+    }));
+
+    vi.mocked(supabase.from).mockImplementation(mockFrom as unknown as typeof supabase.from);
+
+    const result = await loadItinerary(itinerary.id);
+
+    expect(result.days).toEqual(
+      itinerary.days.map((day) => ({
+        ...day,
+        start_time: settings.startTime,
+        end_time: settings.endTime,
+        transport_mode: settings.transportMode,
+      })),
     );
   });
 
