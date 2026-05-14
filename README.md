@@ -17,7 +17,7 @@ An AI-powered travel planning web application built with Next.js 15, React, Supa
 - Optimizes itinerary day order with cached Google Routes API Compute Route Matrix data.
 - Uses ORS Vroom when `ORS_API_KEY` is available, then falls back to the local greedy optimizer.
 - Preserves activity time windows from opening hours, meal windows, and daily start/end settings.
-- Applies authenticated credit capture, per-user rate limiting, and trusted `day_matrices` cache writes in the `optimize-route` Supabase Edge Function.
+- Applies authenticated credit capture and trusted `day_matrices` cache writes in the `optimize-route` Supabase Edge Function.
 
 ## Tech Stack
 
