@@ -8,6 +8,50 @@ export type Database = {
   };
   public: {
     Tables: {
+      day_matrices: {
+        Row: {
+          activity_ids: string[];
+          location_fingerprint: string;
+          day_number: number;
+          id: string;
+          itinerary_id: string;
+          matrix: Json;
+          matrix_source: string;
+          transport_mode: string;
+          updated_at: string;
+        };
+        Insert: {
+          activity_ids: string[];
+          location_fingerprint: string;
+          day_number: number;
+          id?: string;
+          itinerary_id: string;
+          matrix: Json;
+          matrix_source?: string;
+          transport_mode: string;
+          updated_at?: string;
+        };
+        Update: {
+          activity_ids?: string[];
+          location_fingerprint?: string;
+          day_number?: number;
+          id?: string;
+          itinerary_id?: string;
+          matrix?: Json;
+          matrix_source?: string;
+          transport_mode?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "day_matrices_itinerary_id_fkey";
+            columns: ["itinerary_id"];
+            isOneToOne: false;
+            referencedRelation: "itineraries";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       google_places: {
         Row: {
           lat: number | null;
@@ -53,6 +97,7 @@ export type Database = {
           id: string;
           link_access: Database["public"]["Enums"]["link_access_level"];
           preferences: string | null;
+          settings: Json;
           start_date: string;
           status: string;
           title: string;
@@ -67,6 +112,7 @@ export type Database = {
           id?: string;
           link_access?: Database["public"]["Enums"]["link_access_level"];
           preferences?: string | null;
+          settings: Json;
           start_date: string;
           status?: string;
           title: string;
@@ -81,6 +127,7 @@ export type Database = {
           id?: string;
           link_access?: Database["public"]["Enums"]["link_access_level"];
           preferences?: string | null;
+          settings?: Json;
           start_date?: string;
           status?: string;
           title?: string;
@@ -182,6 +229,7 @@ export type Database = {
           id: string;
           link_access: string;
           preferences: string;
+          settings: Json;
           start_date: string;
           status: string;
           title: string;
@@ -204,6 +252,7 @@ export type Database = {
           id: string;
           link_access: string;
           preferences: string;
+          settings: Json;
           start_date: string;
           status: string;
           title: string;
