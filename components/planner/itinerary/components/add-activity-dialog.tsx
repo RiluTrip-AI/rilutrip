@@ -77,7 +77,12 @@ function AddActivityDialogContent({
 
   const onSubmit = async (data: ActivityFormValues) => {
     try {
-      await addActivity(dayNumber, data, insertionIndex);
+      const { resolveStatus } = await addActivity(dayNumber, data, insertionIndex);
+      if (resolveStatus === "not_found") {
+        toast.warning(t("placeNotFound", { name: data.locationName }));
+      } else if (resolveStatus === "error") {
+        toast.error(t("placeResolveError"));
+      }
       onClose();
     } catch (err) {
       console.error("Add activity failed:", err);

@@ -17,6 +17,13 @@ export interface PartialLocation {
   lng?: number;
 }
 
+export type ResolveStatus = "success" | "not_found" | "error";
+
+export interface ResolveResult {
+  status: ResolveStatus;
+  location: Location;
+}
+
 /** Shape of each item returned by the /api/resolve-places endpoint */
 interface ResolvedPlace {
   id: string;
@@ -32,15 +39,14 @@ interface ResolvedPlace {
 }
 
 /**
- * Resolve complete place details via the backend API proxy (/api/resolve-places).
+ * Resolve complete place details via the backend API proxy.
  *
- * Always calls the API to ensure full Google Places data is returned.
- * Falls back to a location with partial details omitted if the API fails.
- *
- * @param location - Partial location (typically just a name)
- * @returns Location with full place details (unknown fields are omitted)
+ * Always returns a result with a status (success / not_found / error) and a
+ * fallback location on failure. Callers that only need the resolved Location
+ * can destructure `{ location }`; callers that want to surface failure reasons
+ * to the user can branch on `status`.
  */
-export async function resolvePlaceDetails(location: PartialLocation): Promise<Location> {
+export async function resolvePlaceDetails(location: PartialLocation): Promise<ResolveResult> {
   try {
     const token = await getAccessToken();
     const id = crypto.randomUUID();
@@ -65,39 +71,45 @@ export async function resolvePlaceDetails(location: PartialLocation): Promise<Lo
 
     if (!response.ok) {
       console.warn("API place resolution failed with status:", response.status);
-      return fallback(location);
+      return { status: "error", location: fallback(location) };
     }
 
     const data = await response.json();
     const resolved = (data.resolved as ResolvedPlace[] | undefined)?.find((r) => r.id === id);
 
+    if (resolved?.error === "NOT_FOUND") {
+      return { status: "not_found", location: fallback(location) };
+    }
+
     if (resolved && !resolved.error) {
       return {
-        name: resolved.name || location.name,
-        ...(resolved.lat !== undefined && { lat: resolved.lat }),
-        ...(resolved.lng !== undefined && { lng: resolved.lng }),
-        ...(resolved.place_id !== undefined && { place_id: resolved.place_id }),
-        ...(resolved.rating !== undefined && { rating: resolved.rating }),
-        ...(resolved.user_ratings_total !== undefined && {
-          user_ratings_total: resolved.user_ratings_total,
-        }),
-        ...(resolved.opening_hours !== undefined && {
-          opening_hours: resolved.opening_hours,
-        }),
-        ...(resolved.website !== undefined && { website: resolved.website }),
+        status: "success",
+        location: {
+          name: resolved.name || location.name,
+          ...(resolved.lat !== undefined && { lat: resolved.lat }),
+          ...(resolved.lng !== undefined && { lng: resolved.lng }),
+          ...(resolved.place_id !== undefined && { place_id: resolved.place_id }),
+          ...(resolved.rating !== undefined && { rating: resolved.rating }),
+          ...(resolved.user_ratings_total !== undefined && {
+            user_ratings_total: resolved.user_ratings_total,
+          }),
+          ...(resolved.opening_hours !== undefined && {
+            opening_hours: resolved.opening_hours,
+          }),
+          ...(resolved.website !== undefined && { website: resolved.website }),
+        },
       };
     }
 
     console.warn("No resolved data returned for:", location.name);
-    return fallback(location);
+    return { status: "error", location: fallback(location) };
   } catch (error) {
     console.error("Error calling /api/resolve-places:", error);
-    return fallback(location);
+    return { status: "error", location: fallback(location) };
   }
 }
 
 function fallback(location: PartialLocation): Location {
-  console.warn(`Failed to resolve "${location.name}", place details will be unavailable`);
   return {
     name: location.name,
     ...(location.lat !== undefined && { lat: location.lat }),

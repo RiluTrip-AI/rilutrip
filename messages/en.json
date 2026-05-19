@@ -160,7 +160,9 @@
       "cancelDelete": "Go back",
       "confirmDelete": "Yes, delete",
       "errorSave": "Failed to save activity. Please try again.",
-      "errorDelete": "Failed to delete activity. Please try again."
+      "errorDelete": "Failed to delete activity. Please try again.",
+      "placeNotFound": "Couldn't find \"{name}\". Try a more specific name.",
+      "placeResolveError": "Place service is temporarily unavailable. Please try again later."
     },
     "addDialog": {
       "title": "Add Activity",
@@ -175,7 +177,9 @@
       "save": "Add activity",
       "saving": "Adding...",
       "cancel": "Cancel",
-      "errorAdd": "Failed to add activity. Please try again."
+      "errorAdd": "Failed to add activity. Please try again.",
+      "placeNotFound": "Couldn't find \"{name}\". Try a more specific name.",
+      "placeResolveError": "Place service is temporarily unavailable. Please try again later."
     },
     "activityPlaceholderCard": {
       "clickToAdd": "Click to Add"

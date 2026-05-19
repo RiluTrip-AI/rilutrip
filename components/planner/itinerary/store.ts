@@ -13,7 +13,7 @@ import { applyOperations, type OperationsUpdate } from "@/lib/ai/operations";
 import { aiClient, ApiError } from "@/lib/ai/client";
 import { calcDayCount } from "@/lib/utils/date";
 import { adjustDays } from "@/lib/utils/itinerary";
-import { resolvePlaceDetails } from "@/lib/places/place-resolver";
+import { resolvePlaceDetails, type ResolveStatus } from "@/lib/places/place-resolver";
 
 let pollingIntervalHandle: ReturnType<typeof setInterval> | null = null;
 
@@ -85,7 +85,7 @@ interface ItineraryState {
       note?: string;
     },
     insertionIndex?: number,
-  ) => Promise<void>;
+  ) => Promise<{ resolveStatus: ResolveStatus }>;
   updateActivity: (
     activityId: string,
     activityInput: {
@@ -95,7 +95,7 @@ interface ItineraryState {
       duration: number;
       note?: string;
     },
-  ) => Promise<void>;
+  ) => Promise<{ resolveStatus: ResolveStatus }>;
   deleteActivity: (activityId: string) => Promise<void>;
 
   setDayTimeWindow: (dayNumber: number, startTime: string, endTime: string) => Promise<void>;
@@ -504,12 +504,12 @@ export const useItineraryStore = create<ItineraryState>((set, get) => ({
   // Add Single Activity
   addActivity: async (dayNumber, activityInput, insertionIndex?: number) => {
     const state = get();
-    if (!state.itinerary) return;
+    if (!state.itinerary) return { resolveStatus: "success" };
 
     set({ isSaving: true, saveError: false });
     try {
       // Resolve location data
-      const resolvedLocation = await resolvePlaceDetails({
+      const { status: resolveStatus, location: resolvedLocation } = await resolvePlaceDetails({
         name: activityInput.locationName,
       });
 
@@ -548,6 +548,7 @@ export const useItineraryStore = create<ItineraryState>((set, get) => ({
         updated_at: new Date().toISOString(),
       });
       get().setHoveredActivity(activity.id);
+      return { resolveStatus };
     } catch (err) {
       console.error("Failed to add activity:", err);
       set({ saveError: true });
@@ -560,7 +561,7 @@ export const useItineraryStore = create<ItineraryState>((set, get) => ({
   // Update Single Activity
   updateActivity: async (activityId, activityInput) => {
     const state = get();
-    if (!state.itinerary) return;
+    if (!state.itinerary) return { resolveStatus: "success" };
 
     let existingActivity: Activity | undefined;
     for (const day of state.itinerary.days) {
@@ -579,15 +580,18 @@ export const useItineraryStore = create<ItineraryState>((set, get) => ({
       activityInput.time !== existingActivity.time ||
       activityInput.duration !== existingActivity.duration_minutes;
 
-    if (!isDirty) return;
+    if (!isDirty) return { resolveStatus: "success" };
 
     set({ isSaving: true, saveError: false });
     try {
       let resolvedLocation = existingActivity.location;
+      let resolveStatus: ResolveStatus = "success";
       if (activityInput.locationName !== existingActivity.location.name) {
-        resolvedLocation = await resolvePlaceDetails({
+        const resolved = await resolvePlaceDetails({
           name: activityInput.locationName,
         });
+        resolvedLocation = resolved.location;
+        resolveStatus = resolved.status;
       }
 
       // Create updated activity object
@@ -613,6 +617,7 @@ export const useItineraryStore = create<ItineraryState>((set, get) => ({
         updated_at: new Date().toISOString(),
       });
       get().setHoveredActivity(activityId);
+      return { resolveStatus };
     } catch (err) {
       console.error("Failed to update activity:", err);
       set({ saveError: true });

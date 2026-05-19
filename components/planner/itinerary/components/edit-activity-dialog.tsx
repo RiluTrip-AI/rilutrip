@@ -67,7 +67,12 @@ function EditActivityDialogContent({ activity, onClose }: Omit<EditActivityDialo
 
   const onSubmit = async (data: ActivityFormValues) => {
     try {
-      await updateActivity(activity.id, data);
+      const { resolveStatus } = await updateActivity(activity.id, data);
+      if (resolveStatus === "not_found") {
+        toast.warning(t("placeNotFound", { name: data.locationName }));
+      } else if (resolveStatus === "error") {
+        toast.error(t("placeResolveError"));
+      }
       onClose();
     } catch (err) {
       console.error("Save activity failed:", err);

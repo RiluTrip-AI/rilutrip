@@ -19,7 +19,7 @@ beforeEach(() => {
 });
 
 describe("resolvePlaceDetails", () => {
-  it("should return full place details on success", async () => {
+  it("returns success status with full place details", async () => {
     mockFetch.mockImplementationOnce(async (_url, options) => {
       const body = JSON.parse(options.body);
       const reqId = body.places[0].id;
@@ -45,55 +45,59 @@ describe("resolvePlaceDetails", () => {
 
     const result = await resolvePlaceDetails({ name: "Tokyo Tower" });
 
-    expect(result.name).toBe("Tokyo Tower");
-    expect(result.lat).toBe(35.6586);
-    expect(result.lng).toBe(139.7454);
-    expect(result.place_id).toBe("ChIJCewJkL2LGGAR3Qmk0vCTGkg");
-    expect(result.rating).toBe(4.5);
-    expect(result.user_ratings_total).toBe(1200);
-    expect(result.opening_hours).toEqual({ periods: [] });
-    expect(result.website).toBe("https://www.tokyotower.co.jp");
+    expect(result.status).toBe("success");
+    expect(result.location.name).toBe("Tokyo Tower");
+    expect(result.location.lat).toBe(35.6586);
+    expect(result.location.lng).toBe(139.7454);
+    expect(result.location.place_id).toBe("ChIJCewJkL2LGGAR3Qmk0vCTGkg");
+    expect(result.location.rating).toBe(4.5);
+    expect(result.location.user_ratings_total).toBe(1200);
+    expect(result.location.opening_hours).toEqual({ periods: [] });
+    expect(result.location.website).toBe("https://www.tokyotower.co.jp");
   });
 
-  it("should omit coordinates when API returns HTTP error", async () => {
-    mockFetch.mockResolvedValueOnce({ ok: false, status: 500 });
-
-    const result = await resolvePlaceDetails({ name: "Unknown Place" });
-
-    expect(result.name).toBe("Unknown Place");
-    expect(result.lat).toBeUndefined();
-    expect(result.lng).toBeUndefined();
-  });
-
-  it("should omit coordinates when API returns NOT_FOUND", async () => {
+  it("returns not_found status when API returns NOT_FOUND", async () => {
     mockFetch.mockImplementationOnce(async (_url, options) => {
       const body = JSON.parse(options.body);
       const reqId = body.places[0].id;
       return {
         ok: true,
         json: async () => ({
-          resolved: [{ id: reqId, error: "NOT_FOUND" }],
+          resolved: [{ id: reqId, name: "Nonexistent", error: "NOT_FOUND" }],
         }),
       };
     });
 
     const result = await resolvePlaceDetails({ name: "Nonexistent" });
 
-    expect(result.lat).toBeUndefined();
-    expect(result.lng).toBeUndefined();
+    expect(result.status).toBe("not_found");
+    expect(result.location.lat).toBeUndefined();
+    expect(result.location.lng).toBeUndefined();
   });
 
-  it("should omit coordinates when fetch throws", async () => {
+  it("returns error status on HTTP error", async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 500 });
+
+    const result = await resolvePlaceDetails({ name: "Unknown Place" });
+
+    expect(result.status).toBe("error");
+    expect(result.location.name).toBe("Unknown Place");
+    expect(result.location.lat).toBeUndefined();
+    expect(result.location.lng).toBeUndefined();
+  });
+
+  it("returns error status when fetch throws", async () => {
     mockFetch.mockRejectedValueOnce(new Error("Network error"));
 
     const result = await resolvePlaceDetails({ name: "Offline Place" });
 
-    expect(result.name).toBe("Offline Place");
-    expect(result.lat).toBeUndefined();
-    expect(result.lng).toBeUndefined();
+    expect(result.status).toBe("error");
+    expect(result.location.name).toBe("Offline Place");
+    expect(result.location.lat).toBeUndefined();
+    expect(result.location.lng).toBeUndefined();
   });
 
-  it("should preserve existing coordinates when API returns HTTP error", async () => {
+  it("preserves existing coordinates on HTTP error", async () => {
     mockFetch.mockResolvedValueOnce({ ok: false, status: 401 });
 
     const result = await resolvePlaceDetails({
@@ -102,22 +106,8 @@ describe("resolvePlaceDetails", () => {
       lng: 121.5654,
     });
 
-    expect(result.name).toBe("Known Place");
-    expect(result.lat).toBe(25.033);
-    expect(result.lng).toBe(121.5654);
-  });
-
-  it("should preserve existing coordinates when fetch throws", async () => {
-    mockFetch.mockRejectedValueOnce(new Error("Network error"));
-
-    const result = await resolvePlaceDetails({
-      name: "Known Offline Place",
-      lat: 35.6586,
-      lng: 139.7454,
-    });
-
-    expect(result.name).toBe("Known Offline Place");
-    expect(result.lat).toBe(35.6586);
-    expect(result.lng).toBe(139.7454);
+    expect(result.status).toBe("error");
+    expect(result.location.lat).toBe(25.033);
+    expect(result.location.lng).toBe(121.5654);
   });
 });

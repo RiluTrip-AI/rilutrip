@@ -160,7 +160,9 @@
       "cancelDelete": "返回修改",
       "confirmDelete": "確認刪除",
       "errorSave": "儲存活動失敗，請再試一次。",
-      "errorDelete": "刪除活動失敗，請再試一次。"
+      "errorDelete": "刪除活動失敗，請再試一次。",
+      "placeNotFound": "找不到「{name}」，請改用更具體的名稱。",
+      "placeResolveError": "地點服務暫時無法使用，請稍後再試。"
     },
     "addDialog": {
       "title": "新增活動",
@@ -175,7 +177,9 @@
       "save": "新增活動",
       "saving": "新增中...",
       "cancel": "取消",
-      "errorAdd": "新增活動失敗，請再試一次。"
+      "errorAdd": "新增活動失敗，請再試一次。",
+      "placeNotFound": "找不到「{name}」，請改用更具體的名稱。",
+      "placeResolveError": "地點服務暫時無法使用，請稍後再試。"
     },
     "activityPlaceholderCard": {
       "clickToAdd": "點擊新增"

@@ -183,7 +183,7 @@ async function applyAddOperation(itinerary: Itinerary, op: AddOperation): Promis
   }
 
   // Ensure location has valid coordinates
-  const location = await resolvePlaceDetails({
+  const { location } = await resolvePlaceDetails({
     name: op.activity.location.name,
   });
 
@@ -306,9 +306,10 @@ async function applyUpdateOperation(itinerary: Itinerary, op: UpdateOperation): 
   // LLM will only provide name (required)
   // resolvePlaceDetails will resolve coordinates via API
   if (op.changes.location !== undefined) {
-    activity.location = await resolvePlaceDetails({
+    const { location } = await resolvePlaceDetails({
       name: op.changes.location.name,
     });
+    activity.location = location;
   }
 
   return itinerary;
