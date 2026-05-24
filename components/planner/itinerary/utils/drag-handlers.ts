@@ -149,16 +149,13 @@ export const handleCrossDayDrag = ({
   const overIndex = targetDay.activities.findIndex((a) => a.id === overId);
 
   if (overIndex !== -1) {
-    let newIndex = overIndex;
-
     const isBelowOverItem =
       over &&
       active.rect.current.translated &&
       active.rect.current.translated.top > over.rect.top + over.rect.height;
 
     const modifier = isBelowOverItem ? 1 : 0;
-
-    newIndex = overIndex >= 0 ? overIndex + modifier : targetDay.activities.length + 1;
+    const newIndex = overIndex + modifier;
 
     targetDay.activities.splice(newIndex, 0, movedActivity);
   } else {
