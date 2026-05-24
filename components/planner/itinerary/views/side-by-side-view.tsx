@@ -47,21 +47,29 @@ export function SideBySideView({
                   onMouseEnter={() => onDayHover?.(day.day_number)}
                   onMouseLeave={() => onDayHover?.(null)}
                 >
-                  <CardTitle className="text-base font-semibold">Day {day.day_number}</CardTitle>
-                  <p className="text-sm text-muted-foreground mt-1">{formattedDate}</p>
-                  <DayTimePicker
-                    dayNumber={day.day_number}
-                    startTime={day.start_time}
-                    endTime={day.end_time}
-                    onSave={setDayTimeWindow}
-                    onApplyAll={setAllDaysTimeWindow}
-                  />
-                  <DayTransportPicker
-                    dayNumber={day.day_number}
-                    mode={day.transport_mode}
-                    onSave={setDayTransportMode}
-                    onApplyAll={setAllDaysTransportMode}
-                  />
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex flex-col">
+                      <CardTitle className="text-base font-semibold">
+                        Day {day.day_number}
+                      </CardTitle>
+                      <p className="text-sm text-muted-foreground">{formattedDate}</p>
+                    </div>
+                    <div className="flex flex-col items-end">
+                      <DayTimePicker
+                        dayNumber={day.day_number}
+                        startTime={day.start_time}
+                        endTime={day.end_time}
+                        onSave={setDayTimeWindow}
+                        onApplyAll={setAllDaysTimeWindow}
+                      />
+                      <DayTransportPicker
+                        dayNumber={day.day_number}
+                        mode={day.transport_mode}
+                        onSave={setDayTransportMode}
+                        onApplyAll={setAllDaysTransportMode}
+                      />
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent className="p-4 flex-1 overflow-y-auto">
                   <DayActivitiesList
