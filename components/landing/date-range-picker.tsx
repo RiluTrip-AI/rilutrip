@@ -107,7 +107,7 @@ export function DateRangePicker({
 
   const handleDateClick = (date: Date) => {
     // If we have nothing or we already have a full range, start fresh
-    if (!startDate || (startDate && endDate)) {
+    if (!startDate || endDate) {
       onChange(date, undefined);
     } else {
       // We only have a startDate, complete the selection
