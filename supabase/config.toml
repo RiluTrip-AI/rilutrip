@@ -6,3 +6,17 @@ verify_jwt = false
 
 [functions.resolve-places]
 verify_jwt = false
+
+[functions.optimize-route]
+verify_jwt = false
+
+[auth]
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["http://localhost:3000/**"]
+enable_signup = true
+
+[auth.external.google]
+enabled = true
+client_id = "env(GOTRUE_EXTERNAL_GOOGLE_CLIENT_ID)"
+secret = "env(GOTRUE_EXTERNAL_GOOGLE_SECRET)"
+skip_nonce_check = false
