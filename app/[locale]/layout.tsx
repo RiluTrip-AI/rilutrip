@@ -74,17 +74,15 @@ export default async function LocaleLayout({
   const messages = await getMessages();
 
   return (
-    <html lang={locale} suppressHydrationWarning>
-      <body>
-        <Analytics />
-        <SpeedInsights />
-        <NextIntlClientProvider messages={messages}>
-          <ThemeProvider>
-            <AuthProvider>{children}</AuthProvider>
-            <Toaster />
-          </ThemeProvider>
-        </NextIntlClientProvider>
-      </body>
-    </html>
+    <>
+      <Analytics />
+      <SpeedInsights />
+      <NextIntlClientProvider messages={messages}>
+        <ThemeProvider>
+          <AuthProvider>{children}</AuthProvider>
+          <Toaster />
+        </ThemeProvider>
+      </NextIntlClientProvider>
+    </>
   );
 }
