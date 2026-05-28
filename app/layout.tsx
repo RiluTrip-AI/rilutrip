@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { getLocale } from "next-intl/server";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -9,13 +10,18 @@ export const metadata: Metadata = {
 /**
  * Root Layout
  *
- * This is the root layout that wraps all routes.
- * The [locale] layout will handle locale-specific configuration.
+ * Provides the required <html> and <body> tags (Next.js 16 enforces this at
+ * the root). Locale-specific providers live in app/[locale]/layout.tsx.
  */
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  return children;
+  const locale = await getLocale();
+  return (
+    <html lang={locale} suppressHydrationWarning>
+      <body>{children}</body>
+    </html>
+  );
 }
