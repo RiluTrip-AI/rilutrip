@@ -135,6 +135,7 @@
     },
     "dayTimeDisplay": {
       "title": "第 {dayNumber} 天時間範圍",
+      "noTime": "設定時間",
       "save": "儲存",
       "applyAll": "套用全部天",
       "errorSave": "儲存時間範圍失敗，請再試一次。",

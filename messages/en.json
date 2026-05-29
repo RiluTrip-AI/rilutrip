@@ -135,6 +135,7 @@
     },
     "dayTimeDisplay": {
       "title": "Day {dayNumber} Time Range",
+      "noTime": "Set hours",
       "save": "Save",
       "applyAll": "Apply to all days",
       "errorSave": "Failed to save time range. Please try again.",

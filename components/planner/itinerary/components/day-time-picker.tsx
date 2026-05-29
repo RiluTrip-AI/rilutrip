@@ -68,10 +68,13 @@ export function DayTimePicker({
   onSave,
   onApplyAll,
 }: DayTimePickerProps) {
-  const [localStartTime, setLocalStartTime] = useState(startTime ?? DEFAULT_START_TIME);
-  const [localEndTime, setLocalEndTime] = useState(endTime ?? DEFAULT_END_TIME);
+  const [localStartTime, setLocalStartTime] = useState<string | null>(startTime ?? null);
+  const [localEndTime, setLocalEndTime] = useState<string | null>(endTime ?? null);
   const [open, setOpen] = useState(false);
-  const [draft, setDraft] = useState({ startTime: localStartTime, endTime: localEndTime });
+  const [draft, setDraft] = useState({
+    startTime: localStartTime ?? DEFAULT_START_TIME,
+    endTime: localEndTime ?? DEFAULT_END_TIME,
+  });
   const [saving, setSaving] = useState(false);
   const [timeError, setTimeError] = useState(false);
   const [panelPos, setPanelPos] = useState({ top: 0, left: 0 });
@@ -80,10 +83,11 @@ export function DayTimePicker({
   const t = useTranslations("planner.dayTimeDisplay");
 
   const isEditable = !!(onSave && onApplyAll);
+  const hasTimeWindow = !!(localStartTime && localEndTime);
 
   useEffect(() => {
-    setLocalStartTime(startTime ?? DEFAULT_START_TIME);
-    setLocalEndTime(endTime ?? DEFAULT_END_TIME);
+    setLocalStartTime(startTime ?? null);
+    setLocalEndTime(endTime ?? null);
   }, [startTime, endTime]);
 
   useEffect(() => {
@@ -116,7 +120,10 @@ export function DayTimePicker({
       const rect = buttonRef.current.getBoundingClientRect();
       setPanelPos({ top: rect.bottom + 4, left: rect.left });
     }
-    setDraft({ startTime: localStartTime, endTime: localEndTime });
+    setDraft({
+      startTime: localStartTime ?? DEFAULT_START_TIME,
+      endTime: localEndTime ?? DEFAULT_END_TIME,
+    });
     setOpen((v) => !v);
   };
 
@@ -186,7 +193,7 @@ export function DayTimePicker({
           <circle cx="12" cy="12" r="10" />
           <polyline points="12 6 12 12 16 14" />
         </svg>
-        {localStartTime} - {localEndTime}
+        {hasTimeWindow ? `${localStartTime} - ${localEndTime}` : t("noTime")}
       </button>
 
       {open &&
