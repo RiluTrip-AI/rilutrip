@@ -72,7 +72,7 @@ interface ItineraryState {
   resetDragState: () => void;
   updateMetadata: (
     updates: Partial<
-      Pick<Itinerary, "title" | "destination" | "start_date" | "end_date" | "preferences">
+      Pick<Itinerary, "title" | "destination" | "start_date" | "end_date" | "description">
     >,
   ) => Promise<void>;
   addActivity: (
@@ -248,7 +248,7 @@ export const useItineraryStore = create<ItineraryState>((set, get) => ({
       destination: nextItinerary.destination,
       start_date: nextItinerary.start_date,
       end_date: nextItinerary.end_date,
-      preferences: nextItinerary.preferences,
+      description: nextItinerary.description,
       days: nextItinerary.days,
     };
 
@@ -300,7 +300,7 @@ export const useItineraryStore = create<ItineraryState>((set, get) => ({
       destination: previousItinerary.destination,
       start_date: previousItinerary.start_date,
       end_date: previousItinerary.end_date,
-      preferences: previousItinerary.preferences,
+      description: previousItinerary.description,
       days: previousItinerary.days,
     };
 
@@ -346,7 +346,7 @@ export const useItineraryStore = create<ItineraryState>((set, get) => ({
       destination: nextItinerary.destination,
       start_date: nextItinerary.start_date,
       end_date: nextItinerary.end_date,
-      preferences: nextItinerary.preferences,
+      description: nextItinerary.description,
       days: nextItinerary.days,
     };
 
@@ -456,8 +456,8 @@ export const useItineraryStore = create<ItineraryState>((set, get) => ({
       destination: updates.destination ?? currentItinerary.destination,
       start_date: newStart,
       end_date: newEnd,
-      preferences:
-        updates.preferences !== undefined ? updates.preferences : currentItinerary.preferences,
+      description:
+        updates.description !== undefined ? updates.description : currentItinerary.description,
       days:
         newDayCount !== oldDayCount
           ? adjustDays(currentItinerary.days, newDayCount)

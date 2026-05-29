@@ -77,7 +77,7 @@ export const ItinerarySchema = z
     destination: z.string().min(1, "Destination is required").max(100),
     start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Start date must be in YYYY-MM-DD format"),
     end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "End date must be in YYYY-MM-DD format"),
-    preferences: z.string().max(1000, "Preferences are too long").optional(),
+    description: z.string().max(1000, "Description is too long").optional(),
     status: z.enum(["draft", "generating", "completed", "failed"]).optional(),
     days: z.array(DaySchema),
     link_access: LinkAccessSchema.default("none"),

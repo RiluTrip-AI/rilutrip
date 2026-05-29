@@ -22,7 +22,7 @@ export const createTripFormSchema = (t: TranslationFunction) =>
         from: z.date().optional(),
         to: z.date().optional(),
       }),
-      preferences: z.string().max(1000, t("validation.preferencesMaxLength")).optional(),
+      description: z.string().max(1000, t("validation.preferencesMaxLength")).optional(),
     })
     .superRefine((data, ctx) => {
       const { from, to } = data.dates;
@@ -100,7 +100,7 @@ export const createEditMetadataFormSchema = (t: TranslationFunction) =>
         from: z.date().optional(),
         to: z.date().optional(),
       }),
-      preferences: z.string().max(1000, t("validation.preferencesMaxLength")).optional(),
+      description: z.string().max(1000, t("validation.preferencesMaxLength")).optional(),
     })
     .superRefine((data, ctx) => {
       const { from, to } = data.dates;

@@ -31,7 +31,7 @@ export function TripForm() {
     resolver: zodResolver(createTripFormSchema((key) => tv(key))),
     defaultValues: {
       destination: "",
-      preferences: "",
+      description: "",
       dates: {
         from: undefined,
         to: undefined,
@@ -63,7 +63,7 @@ export function TripForm() {
         destination: data.destination,
         start_date: formattedStart,
         end_date: formattedEnd,
-        preferences: data.preferences?.trim() || undefined,
+        description: data.description?.trim() || undefined,
       });
 
       router.push(`/plan/${itinerary.id}`);
@@ -149,9 +149,9 @@ export function TripForm() {
                 placeholder={t("preferencesPlaceholder")}
                 disabled={isLoading}
                 className="min-h-[120px] resize-none"
-                {...form.register("preferences")}
-                error={!!form.formState.errors.preferences}
-                helperText={form.formState.errors.preferences?.message?.toString()}
+                {...form.register("description")}
+                error={!!form.formState.errors.description}
+                helperText={form.formState.errors.description?.message?.toString()}
               />
             </div>
 

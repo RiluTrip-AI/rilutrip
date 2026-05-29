@@ -51,7 +51,7 @@ Deno.serve(async (req) => {
     // Fetch itinerary from DB — relying on RLS to enforce user ownership
     const { data: itineraryRow, error: fetchError } = await supabaseClient
       .from("itineraries")
-      .select("id, user_id, destination, start_date, end_date, preferences, status")
+      .select("id, user_id, destination, start_date, end_date, description, status")
       .eq("id", itinerary_id)
       .single();
 
@@ -68,7 +68,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { destination, start_date: startDate, end_date: endDate, preferences } = itineraryRow;
+    const { destination, start_date: startDate, end_date: endDate, description } = itineraryRow;
 
     operationId = crypto.randomUUID();
 
@@ -156,7 +156,7 @@ Deno.serve(async (req) => {
       destination,
       startDate,
       endDate,
-      preferences ?? undefined,
+      description ?? undefined,
       locale,
     );
 

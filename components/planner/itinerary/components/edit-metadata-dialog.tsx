@@ -29,7 +29,7 @@ interface EditMetadataDialogProps {
   onClose: () => void;
   onSave: (
     updates: Partial<
-      Pick<Itinerary, "title" | "destination" | "start_date" | "end_date" | "preferences">
+      Pick<Itinerary, "title" | "destination" | "start_date" | "end_date" | "description">
     >,
   ) => Promise<void>;
   onDelete?: () => Promise<void>;
@@ -67,7 +67,7 @@ function EditMetadataDialogContent({
     defaultValues: {
       title: itinerary.title,
       destination: itinerary.destination,
-      preferences: itinerary.preferences || "",
+      description: itinerary.description || "",
       dates: {
         from: parseLocalDate(itinerary.start_date),
         to: parseLocalDate(itinerary.end_date),
@@ -120,7 +120,7 @@ function EditMetadataDialogContent({
         destination: data.destination,
         start_date: formattedStart,
         end_date: formattedEnd,
-        preferences: data.preferences || undefined,
+        description: data.description || undefined,
       });
       onClose();
     } catch (err) {
@@ -220,11 +220,11 @@ function EditMetadataDialogContent({
               id="tripPreferences"
               disabled={isSaving || isDeleting}
               className="min-h-[100px]"
-              {...form.register("preferences")}
+              {...form.register("description")}
             />
-            {form.formState.errors.preferences && (
+            {form.formState.errors.description && (
               <p className="text-xs text-destructive mt-1">
-                {form.formState.errors.preferences.message?.toString()}
+                {form.formState.errors.description.message?.toString()}
               </p>
             )}
           </div>
