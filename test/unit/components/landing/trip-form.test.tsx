@@ -129,7 +129,7 @@ describe("TripForm - Form Validation", () => {
     render(<TripForm />);
 
     const destinationInput = screen.getByPlaceholderText(/destinationPlaceholder/i);
-    const preferencesTextarea = screen.getByPlaceholderText(/preferencesPlaceholder/i);
+    const descriptionTextarea = screen.getByPlaceholderText(/descriptionPlaceholder/i);
 
     // Submit with destination only (no preferences)
     fireEvent.change(destinationInput, { target: { value: "Paris" } });
@@ -145,7 +145,7 @@ describe("TripForm - Form Validation", () => {
     });
 
     // Now add preferences and submit again
-    fireEvent.change(preferencesTextarea, {
+    fireEvent.change(descriptionTextarea, {
       target: { value: "Budget-friendly foodie tour" },
     });
     fireEvent.click(submitButton);
