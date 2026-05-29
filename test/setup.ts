@@ -104,8 +104,8 @@ vi.mock("next-intl", () => {
     "landing.form.whereToNext": "whereToNext",
     "landing.form.destinationPlaceholder": "destinationPlaceholder",
     "landing.form.whenAreYouGoing": "whenAreYouGoing",
-    "landing.form.describeYourPreferences": "describeYourPreferences",
-    "landing.form.preferencesPlaceholder": "preferencesPlaceholder",
+    "landing.form.describeYourTrip": "describeYourTrip",
+    "landing.form.descriptionPlaceholder": "descriptionPlaceholder",
     "landing.form.generateButton": "generateButton",
     "landing.form.generating": "generating",
   };

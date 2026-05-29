@@ -33,7 +33,7 @@ const baseItinerary: Itinerary = {
   destination: "Tokyo",
   start_date: "2026-05-01",
   end_date: "2026-05-03",
-  preferences: undefined,
+  description: undefined,
   days: [
     { day_number: 1, activities: [], start_time: "09:00", end_time: "20:00" },
     { day_number: 2, activities: [] },

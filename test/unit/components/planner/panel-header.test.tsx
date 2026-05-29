@@ -61,7 +61,7 @@ const itinerary: Itinerary = {
   destination: "Taipei",
   start_date: "2026-04-04",
   end_date: "2026-04-06",
-  preferences: undefined,
+  description: undefined,
   status: "completed",
   days: [],
   link_access: "none",

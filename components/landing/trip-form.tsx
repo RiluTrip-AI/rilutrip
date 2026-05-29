@@ -31,7 +31,7 @@ export function TripForm() {
     resolver: zodResolver(createTripFormSchema((key) => tv(key))),
     defaultValues: {
       destination: "",
-      preferences: "",
+      description: "",
       dates: {
         from: undefined,
         to: undefined,
@@ -63,7 +63,7 @@ export function TripForm() {
         destination: data.destination,
         start_date: formattedStart,
         end_date: formattedEnd,
-        preferences: data.preferences?.trim() || undefined,
+        description: data.description?.trim() || undefined,
       });
 
       router.push(`/plan/${itinerary.id}`);
@@ -139,19 +139,19 @@ export function TripForm() {
             {/* Preferences/Custom Preferences Textarea */}
             <div>
               <label
-                htmlFor="preferences"
+                htmlFor="description"
                 className="block text-sm font-medium mb-2 text-foreground/80"
               >
-                {t("describeYourPreferences")}
+                {t("describeYourTrip")}
               </label>
               <Textarea
-                id="preferences"
-                placeholder={t("preferencesPlaceholder")}
+                id="description"
+                placeholder={t("descriptionPlaceholder")}
                 disabled={isLoading}
                 className="min-h-[120px] resize-none"
-                {...form.register("preferences")}
-                error={!!form.formState.errors.preferences}
-                helperText={form.formState.errors.preferences?.message?.toString()}
+                {...form.register("description")}
+                error={!!form.formState.errors.description}
+                helperText={form.formState.errors.description?.message?.toString()}
               />
             </div>
 
