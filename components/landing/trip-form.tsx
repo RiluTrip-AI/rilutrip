@@ -142,7 +142,7 @@ export function TripForm() {
                 htmlFor="description"
                 className="block text-sm font-medium mb-2 text-foreground/80"
               >
-                {t("describeYourDescription")}
+                {t("describeYourTrip")}
               </label>
               <Textarea
                 id="description"
