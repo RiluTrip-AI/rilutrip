@@ -139,14 +139,14 @@ export function TripForm() {
             {/* Preferences/Custom Preferences Textarea */}
             <div>
               <label
-                htmlFor="preferences"
+                htmlFor="description"
                 className="block text-sm font-medium mb-2 text-foreground/80"
               >
-                {t("describeYourPreferences")}
+                {t("describeYourDescription")}
               </label>
               <Textarea
-                id="preferences"
-                placeholder={t("preferencesPlaceholder")}
+                id="description"
+                placeholder={t("descriptionPlaceholder")}
                 disabled={isLoading}
                 className="min-h-[120px] resize-none"
                 {...form.register("description")}
