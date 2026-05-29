@@ -97,7 +97,7 @@ describe("ExpandableView - DayTimePicker integration", () => {
     });
   });
 
-  it("uses default time when day has no start_time or end_time", () => {
+  it("shows empty state and defaults to standard hours when day has no start_time or end_time", async () => {
     const itinerary: Itinerary = {
       ...baseItinerary,
       days: [{ day_number: 1, activities: [] }],
@@ -113,9 +113,16 @@ describe("ExpandableView - DayTimePicker integration", () => {
         setAllDaysTimeWindow={noop}
       />,
     );
-    const button = screen.getByRole("button", { name: /09:00.*20:00/i });
-    expect(button).toHaveTextContent("09:00");
-    expect(button).toHaveTextContent("20:00");
+    const button = screen.getByRole("button", { name: /set hours/i });
+    expect(button).not.toHaveTextContent("09:00");
+    expect(button).not.toHaveTextContent("20:00");
+
+    // Editing an empty day falls back to the default time window.
+    fireEvent.click(button);
+    fireEvent.click(screen.getByText("Save"));
+    await waitFor(() => {
+      expect(noop).toHaveBeenCalledWith(1, "09:00", "20:00");
+    });
   });
 });
 

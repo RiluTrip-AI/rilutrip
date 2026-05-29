@@ -96,6 +96,7 @@ vi.mock("next-intl", () => {
     "planner.transportMode.applyAllSuccess": "Applied {mode} to all days",
     // Day time display
     "planner.dayTimeDisplay.title": "Day {dayNumber} Time Range",
+    "planner.dayTimeDisplay.noTime": "Set hours",
     "planner.dayTimeDisplay.save": "Save",
     "planner.dayTimeDisplay.applyAll": "Apply to all days",
     "planner.dayTimeDisplay.errorSave": "Failed to save time range. Please try again.",
