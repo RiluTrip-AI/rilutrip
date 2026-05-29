@@ -48,11 +48,12 @@ export type Database = {
         Row: {
           created_at: string;
           data: Json | null;
+          description: string | null;
           destination: string;
           end_date: string;
           id: string;
           link_access: Database["public"]["Enums"]["link_access_level"];
-          preferences: string | null;
+          preference: Json;
           start_date: string;
           status: string;
           title: string;
@@ -62,11 +63,12 @@ export type Database = {
         Insert: {
           created_at?: string;
           data?: Json | null;
+          description?: string | null;
           destination: string;
           end_date: string;
           id?: string;
           link_access?: Database["public"]["Enums"]["link_access_level"];
-          preferences?: string | null;
+          preference?: Json;
           start_date: string;
           status?: string;
           title: string;
@@ -76,11 +78,12 @@ export type Database = {
         Update: {
           created_at?: string;
           data?: Json | null;
+          description?: string | null;
           destination?: string;
           end_date?: string;
           id?: string;
           link_access?: Database["public"]["Enums"]["link_access_level"];
-          preferences?: string | null;
+          preference?: Json;
           start_date?: string;
           status?: string;
           title?: string;
@@ -177,11 +180,12 @@ export type Database = {
         Returns: {
           created_at: string;
           data: Json;
+          description: string | null;
           destination: string;
           end_date: string;
           id: string;
           link_access: string;
-          preferences: string;
+          preference: Json;
           start_date: string;
           status: string;
           title: string;
@@ -199,11 +203,12 @@ export type Database = {
         Returns: {
           created_at: string;
           data: Json;
+          description: string | null;
           destination: string;
           end_date: string;
           id: string;
           link_access: string;
-          preferences: string;
+          preference: Json;
           start_date: string;
           status: string;
           title: string;
