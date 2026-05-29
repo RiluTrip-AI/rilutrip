@@ -18,6 +18,48 @@ type GenerateItineraryRequest = z.infer<typeof GenerateRequestSchema>;
 
 import { buildItineraryPrompt } from "./prompt.ts";
 
+const VALID_TRANSPORT_MODES = ["driving", "walking", "transit", "bicycling"];
+const TIME_FORMAT = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;
+
+interface RawDayMeta {
+  start_time?: unknown;
+  end_time?: unknown;
+  transport_mode?: unknown;
+}
+
+/**
+ * Validate AI-provided day-level metadata at the trust boundary.
+ *
+ * Keeps only well-formed values and drops anything invalid — it never
+ * fabricates defaults. A missing/invalid field stays absent so the rest of
+ * the system can treat `undefined` as "not set" and resolve a default at the
+ * point of use (e.g. route optimization) rather than baking a guess into the DB.
+ */
+function sanitizeDayMeta(meta: RawDayMeta): {
+  start_time?: string;
+  end_time?: string;
+  transport_mode?: string;
+} {
+  const start =
+    typeof meta.start_time === "string" && TIME_FORMAT.test(meta.start_time)
+      ? meta.start_time
+      : undefined;
+  const end =
+    typeof meta.end_time === "string" && TIME_FORMAT.test(meta.end_time)
+      ? meta.end_time
+      : undefined;
+  const transport_mode =
+    typeof meta.transport_mode === "string" && VALID_TRANSPORT_MODES.includes(meta.transport_mode)
+      ? meta.transport_mode
+      : undefined;
+
+  return {
+    // Times only make sense as a pair with start before end; drop both otherwise.
+    ...(start && end && start < end ? { start_time: start, end_time: end } : {}),
+    ...(transport_mode ? { transport_mode } : {}),
+  };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -182,19 +224,53 @@ Deno.serve(async (req) => {
           {
             day_number: number;
             activities: object[];
+            start_time?: unknown;
+            end_time?: unknown;
+            transport_mode?: unknown;
           }
         >();
+
+        function ensureDay(day_number: number) {
+          if (!dayMap.has(day_number)) {
+            dayMap.set(day_number, { day_number, activities: [] });
+          }
+          return dayMap.get(day_number)!;
+        }
 
         // Track async resolution tasks before saving
         const pendingResolutions: Promise<void>[] = [];
 
-        // @streamparser/json: fire onValue for each complete activity object
-        // paths: ["$.itinerary.*.activities.*"] means each activity in each day
+        // @streamparser/json: fire onValue for each complete activity object as
+        // well as the day-level scalar fields. `$.itinerary.*.activities.*`
+        // matches each activity; the scalar paths match each day's metadata.
         const parser = new JSONParser({
-          paths: ["$.itinerary.*.activities.*"],
+          paths: [
+            "$.itinerary.*.activities.*",
+            "$.itinerary.*.start_time",
+            "$.itinerary.*.end_time",
+            "$.itinerary.*.transport_mode",
+          ],
         });
 
-        parser.onValue = ({ value, stack }: { value: unknown; stack: Array<{ key?: number }> }) => {
+        parser.onValue = ({
+          value,
+          key,
+          stack,
+        }: {
+          value?: unknown;
+          key?: string | number;
+          stack: Array<{ key?: string | number }>;
+        }) => {
+          const dayIndex = stack[2]?.key;
+          if (typeof dayIndex !== "number") return;
+          const day_number = dayIndex + 1; // Convert 0-based index to 1-based day number
+
+          // Day-level scalar fields live directly on the day object.
+          if (key === "start_time" || key === "end_time" || key === "transport_mode") {
+            ensureDay(day_number)[key] = value;
+            return;
+          }
+
           const activity = value as {
             time: string;
             title: string;
@@ -214,13 +290,6 @@ Deno.serve(async (req) => {
 
           if (!activity.time || !activity.title) return;
 
-          // Extract day_number from JSONPath stack
-          // stack format: [root, "itinerary", dayIndex, "activities", activityIndex]
-          // Each element is a StackElement { key, value, partial }
-          const dayIndex = stack[2]?.key;
-          if (typeof dayIndex !== "number") return;
-          const day_number = dayIndex + 1; // Convert 0-based index to 1-based day number
-
           // Add UUID and order
           const activityWithId = {
             ...activity,
@@ -229,10 +298,7 @@ Deno.serve(async (req) => {
           };
 
           // Accumulate for DB save synchronously to maintain order
-          if (!dayMap.has(day_number)) {
-            dayMap.set(day_number, { day_number, activities: [] });
-          }
-          dayMap.get(day_number)!.activities.push(activityWithId);
+          ensureDay(day_number).activities.push(activityWithId);
 
           // Resolve place info asynchronously before emitting SSE
           const resolveTask = (async () => {
@@ -319,7 +385,14 @@ Deno.serve(async (req) => {
           await Promise.all(pendingResolutions);
 
           // Convert map to sorted array
-          const allDays = Array.from(dayMap.values()).sort((a, b) => a.day_number - b.day_number);
+          const allDays = Array.from(dayMap.values())
+            .sort((a, b) => a.day_number - b.day_number)
+            .map(({ day_number, activities, start_time, end_time, transport_mode }) => ({
+              day_number,
+              activities,
+              // Validate AI-provided metadata; invalid/missing values are dropped, not defaulted.
+              ...sanitizeDayMeta({ start_time, end_time, transport_mode }),
+            }));
 
           // Save complete itinerary to DB
           const { error: updateError } = await supabaseAdmin
