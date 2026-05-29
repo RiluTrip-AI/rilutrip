@@ -10,35 +10,22 @@ const MIGRATION_PATH = resolve(
 describe("consolidate_itinerary_preference migration", () => {
   const sql = readFileSync(MIGRATION_PATH, "utf8");
 
-  it("renames settings to preference and preferences to description", () => {
-    expect(sql).toMatch(/rename column settings to preference/i);
+  it("drops settings and renames preferences to description", () => {
+    expect(sql).toMatch(/drop column settings/i);
     expect(sql).toMatch(/rename column preferences to description/i);
   });
 
-  it("backfills null preference then sets NOT NULL and a default", () => {
-    expect(sql).toMatch(
-      /update public\.itineraries[\s\S]*preference[\s\S]*where preference is null/i,
-    );
-    expect(sql).toMatch(/alter column preference set not null/i);
-    const match = sql.match(/set default\s+'([^']+)'::jsonb/i);
-    expect(match).not.toBeNull();
-    expect(JSON.parse(match![1])).toEqual({
-      startTime: "09:00",
-      endTime: "21:00",
-      transportMode: "transit",
-    });
+  it("does not introduce a preference column", () => {
+    expect(sql).not.toMatch(/\bpreference\b/i);
   });
 
-  it("renames both check constraints", () => {
-    expect(sql).toMatch(
-      /rename constraint itineraries_settings_valid to itineraries_preference_valid/i,
-    );
+  it("renames the description check constraint", () => {
     expect(sql).toMatch(
       /rename constraint itineraries_preferences_check to itineraries_description_check/i,
     );
   });
 
-  it("recreates both public RPC functions with renamed columns", () => {
+  it("recreates both public RPC functions without the dropped columns", () => {
     expect(sql).toMatch(/drop function if exists public\.get_public_itinerary/i);
     expect(sql).toMatch(/drop function if exists public\.update_public_itinerary/i);
     expect(sql).toMatch(/create or replace function "?public"?\."?get_public_itinerary/i);

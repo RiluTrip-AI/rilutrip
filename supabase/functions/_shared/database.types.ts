@@ -53,7 +53,6 @@ export type Database = {
           end_date: string;
           id: string;
           link_access: Database["public"]["Enums"]["link_access_level"];
-          preference: Json;
           start_date: string;
           status: string;
           title: string;
@@ -68,7 +67,6 @@ export type Database = {
           end_date: string;
           id?: string;
           link_access?: Database["public"]["Enums"]["link_access_level"];
-          preference?: Json;
           start_date: string;
           status?: string;
           title: string;
@@ -83,7 +81,6 @@ export type Database = {
           end_date?: string;
           id?: string;
           link_access?: Database["public"]["Enums"]["link_access_level"];
-          preference?: Json;
           start_date?: string;
           status?: string;
           title?: string;
@@ -185,7 +182,6 @@ export type Database = {
           end_date: string;
           id: string;
           link_access: string;
-          preference: Json;
           start_date: string;
           status: string;
           title: string;
@@ -208,7 +204,6 @@ export type Database = {
           end_date: string;
           id: string;
           link_access: string;
-          preference: Json;
           start_date: string;
           status: string;
           title: string;
