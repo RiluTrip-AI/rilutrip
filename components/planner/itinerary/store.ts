@@ -836,13 +836,15 @@ async function startStreamingInternal(
   const controller = new AbortController();
   set({ isGenerating: true, generationAbortController: controller });
 
+  let streamCompleted = false;
+
   try {
     await aiClient.streamItinerary(
       itineraryId,
       locale,
       (data) => appendStreamedActivityInternal(data.day_number, data.activity, set),
       () => {
-        set({ isGenerating: false, generationAbortController: null });
+        streamCompleted = true;
       },
       () => {
         set({
@@ -854,6 +856,16 @@ async function startStreamingInternal(
       },
       controller.signal,
     );
+
+    if (streamCompleted) {
+      try {
+        const finalItinerary = await loadItinerary(itineraryId);
+        set({ itinerary: finalItinerary, isGenerating: false, generationAbortController: null });
+      } catch (reloadErr) {
+        console.error("Post-generation reconcile failed:", reloadErr);
+        set({ isGenerating: false, generationAbortController: null });
+      }
+    }
   } catch (err) {
     if (err instanceof Error && err.name === "AbortError") return;
 
