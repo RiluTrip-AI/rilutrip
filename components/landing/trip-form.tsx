@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "@/lib/i18n/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { Input } from "@/components/ui/input";
@@ -39,10 +39,6 @@ export function TripForm() {
   const [loginOpen, setLoginOpen] = useState(false);
   const [generalError, setGeneralError] = useState<string>();
   const [advancedOpen, setAdvancedOpen] = useState(false);
-  // Track whether the advanced section has been opened at least once. The
-  // hint is only appended when the user actually engaged with this section —
-  // pristine defaults should not surface to the AI as a preference.
-  const advancedEverOpenedRef = useRef(false);
 
   const form = useForm<TripFormValues>({
     resolver: zodResolver(createTripFormSchema((key) => tv(key))) as Resolver<TripFormValues>,
@@ -60,11 +56,7 @@ export function TripForm() {
   });
 
   const toggleAdvanced = () => {
-    setAdvancedOpen((open) => {
-      const next = !open;
-      if (next) advancedEverOpenedRef.current = true;
-      return next;
-    });
+    setAdvancedOpen((open) => !open);
   };
 
   const onSubmit = async (data: TripFormValues) => {
@@ -89,7 +81,6 @@ export function TripForm() {
         startTime: data.startTime,
         endTime: data.endTime,
         transportMode: data.transportMode,
-        advancedOpened: advancedEverOpenedRef.current,
         locale,
         transportModeLabel: tp(`transportMode.${data.transportMode}`),
       });

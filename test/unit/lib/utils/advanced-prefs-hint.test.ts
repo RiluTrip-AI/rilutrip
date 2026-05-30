@@ -11,24 +11,11 @@ describe("buildAdvancedPrefsHint", () => {
     startTime: DEFAULT_ADVANCED_START_TIME,
     endTime: DEFAULT_ADVANCED_END_TIME,
     transportMode: DEFAULT_ADVANCED_TRANSPORT_MODE,
-    advancedOpened: true,
     locale: "en",
     transportModeLabel: "Transit",
   };
 
-  it("returns null when advancedOpened is false (even if values differ)", () => {
-    const hint = buildAdvancedPrefsHint({
-      ...baseInput,
-      startTime: "06:00",
-      endTime: "23:00",
-      transportMode: "walking",
-      transportModeLabel: "Walking",
-      advancedOpened: false,
-    });
-    expect(hint).toBeNull();
-  });
-
-  it("returns null when advancedOpened but all values are at defaults", () => {
+  it("returns null when all values are at defaults", () => {
     const hint = buildAdvancedPrefsHint(baseInput);
     expect(hint).toBeNull();
   });

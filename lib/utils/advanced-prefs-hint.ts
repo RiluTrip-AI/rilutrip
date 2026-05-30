@@ -16,8 +16,6 @@ export interface AdvancedPrefsHintInput {
   startTime: string;
   endTime: string;
   transportMode: TransportMode;
-  /** Whether the user has opened the advanced section at least once. */
-  advancedOpened: boolean;
   /** Active app locale (e.g. "en" | "zh-TW"). Anything else falls back to en. */
   locale: string;
   /** Localized display name for transportMode (e.g. "Walking" / "步行"). */
@@ -26,17 +24,19 @@ export interface AdvancedPrefsHintInput {
 
 /**
  * Build a single sentence to append to the AI prompt's customPreferences
- * (= itinerary description). Returns null when no hint should be appended:
- * the user never opened the advanced section, or every field is still at its
- * default (no preference expressed).
+ * (= itinerary description). Returns null when every field is still at its
+ * default — silence is correct because the user has expressed no preference.
+ *
+ * The UI keeps the advanced section collapsed by default, so the only way for
+ * any of these fields to differ from a default is for the user to have opened
+ * the section and interacted with a control. That means "differs from default"
+ * already captures the "user engaged" intent without a separate flag.
  *
  * The output is a clear instruction so the AI is unlikely to ignore it, while
- * still being a hint — Eric's sanitizeDayMeta remains the source of truth for
- * what actually lands in the day-level metadata.
+ * still being a hint — sanitizeDayMeta in the edge function remains the source
+ * of truth for what actually lands in the day-level metadata.
  */
 export function buildAdvancedPrefsHint(input: AdvancedPrefsHintInput): string | null {
-  if (!input.advancedOpened) return null;
-
   const changed =
     input.startTime !== DEFAULT_ADVANCED_START_TIME ||
     input.endTime !== DEFAULT_ADVANCED_END_TIME ||
