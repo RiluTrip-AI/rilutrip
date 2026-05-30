@@ -29,7 +29,8 @@
     "noteMaxLength": "筆記最多 500 個字元",
     "descriptionMaxLength": "偏好最多 1000 個字元",
     "pastDateNotAllowed": "不能選擇過去的日期",
-    "dateTooLong": "行程天數不能超過 14 天"
+    "dateTooLong": "行程天數不能超過 14 天",
+    "endTimeAfterStart": "結束時間必須晚於開始時間"
   },
   "landing": {
     "hero": {
@@ -47,6 +48,12 @@
       "generating": "產生中...",
       "itineraryLimitError": "您目前方案可建立的行程數量已達上限。",
       "createError": "建立行程失敗。請重試。",
+      "advanced": "進階設定",
+      "dailyTimeRange": "每日時間範圍",
+      "startTimeLabel": "開始時間",
+      "endTimeLabel": "結束時間",
+      "transportMode": "交通方式",
+      "optional": "（選填）",
       "perfectArrangeButton": "完美安排",
       "autoOptimizing": "路線優化中..."
     },

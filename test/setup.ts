@@ -79,6 +79,8 @@ vi.mock("next-intl", () => {
     "validation.datesRequired": "Dates are required",
     "validation.bothDatesRequired": "Please select both start and end dates",
     "validation.endDateAfterStart": "End date must be on or after start date",
+    "validation.endTimeAfterStart": "End time must be after start time",
+    "validation.timeInvalidFormat": "Time must be in HH:MM format",
     // Error messages
     "landing.form.itineraryLimitError":
       "You have reached your itinerary limit for the current plan.",
@@ -109,6 +111,12 @@ vi.mock("next-intl", () => {
     "landing.form.descriptionPlaceholder": "descriptionPlaceholder",
     "landing.form.generateButton": "generateButton",
     "landing.form.generating": "generating",
+    "landing.form.advanced": "Advanced",
+    "landing.form.dailyTimeRange": "Daily time range",
+    "landing.form.startTimeLabel": "Start time",
+    "landing.form.endTimeLabel": "End time",
+    "landing.form.transportMode": "Transport mode",
+    "landing.form.optional": "(optional)",
   };
 
   return {

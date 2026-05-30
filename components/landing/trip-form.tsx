@@ -1,34 +1,51 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "@/lib/i18n/navigation";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { TimeSelect } from "@/components/ui/time-select";
 import { TrendingDestinations } from "./trending-destinations";
 import { DateRangePicker } from "./date-range-picker";
 import { LoginDialog } from "@/components/auth/login-dialog";
 import { getCurrentUser } from "@/lib/supabase/client";
 import { createItineraryMetadata, ItineraryLimitError } from "@/lib/supabase/itineraries";
 import { formatLocalDate } from "@/lib/utils/date";
+import {
+  buildAdvancedPrefsHint,
+  DEFAULT_ADVANCED_START_TIME,
+  DEFAULT_ADVANCED_END_TIME,
+  DEFAULT_ADVANCED_TRANSPORT_MODE,
+} from "@/lib/utils/advanced-prefs-hint";
+import type { TransportMode } from "@/types/itinerary";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm, Controller } from "react-hook-form";
+import { useForm, Controller, type Resolver } from "react-hook-form";
 import { createTripFormSchema, type TripFormValues } from "@/types/forms";
+
+const TRANSPORT_OPTIONS: TransportMode[] = ["driving", "walking", "transit", "bicycling"];
 
 export function TripForm() {
   const t = useTranslations("landing.form");
   const tv = useTranslations();
   const ti = useTranslations("itineraries");
+  const tp = useTranslations("planner");
+  const locale = useLocale();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
   const [generalError, setGeneralError] = useState<string>();
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  // Track whether the advanced section has been opened at least once. The
+  // hint is only appended when the user actually engaged with this section —
+  // pristine defaults should not surface to the AI as a preference.
+  const advancedEverOpenedRef = useRef(false);
 
   const form = useForm<TripFormValues>({
-    resolver: zodResolver(createTripFormSchema((key) => tv(key))),
+    resolver: zodResolver(createTripFormSchema((key) => tv(key))) as Resolver<TripFormValues>,
     defaultValues: {
       destination: "",
       description: "",
@@ -36,8 +53,19 @@ export function TripForm() {
         from: undefined,
         to: undefined,
       },
+      startTime: DEFAULT_ADVANCED_START_TIME,
+      endTime: DEFAULT_ADVANCED_END_TIME,
+      transportMode: DEFAULT_ADVANCED_TRANSPORT_MODE,
     },
   });
+
+  const toggleAdvanced = () => {
+    setAdvancedOpen((open) => {
+      const next = !open;
+      if (next) advancedEverOpenedRef.current = true;
+      return next;
+    });
+  };
 
   const onSubmit = async (data: TripFormValues) => {
     setIsLoading(true);
@@ -57,13 +85,24 @@ export function TripForm() {
 
       const title = ti("titleFormat", { destination: data.destination });
 
+      const hint = buildAdvancedPrefsHint({
+        startTime: data.startTime,
+        endTime: data.endTime,
+        transportMode: data.transportMode,
+        advancedOpened: advancedEverOpenedRef.current,
+        locale,
+        transportModeLabel: tp(`transportMode.${data.transportMode}`),
+      });
+      const baseDescription = data.description?.trim() ?? "";
+      const finalDescription = [baseDescription, hint].filter(Boolean).join("\n\n") || undefined;
+
       const itinerary = await createItineraryMetadata({
         user_id: user.id,
         title,
         destination: data.destination,
         start_date: formattedStart,
         end_date: formattedEnd,
-        description: data.description?.trim() || undefined,
+        description: finalDescription,
       });
 
       router.push(`/plan/${itinerary.id}`);
@@ -153,6 +192,104 @@ export function TripForm() {
                 error={!!form.formState.errors.description}
                 helperText={form.formState.errors.description?.message?.toString()}
               />
+            </div>
+
+            {/* Advanced preferences (collapsed by default). Values are appended
+                to description as a hint to the AI — they are not persisted as
+                separate columns. See lib/utils/advanced-prefs-hint. */}
+            <div className="border-t border-border pt-4">
+              <button
+                type="button"
+                onClick={toggleAdvanced}
+                aria-expanded={advancedOpen}
+                aria-controls="advanced-trip-prefs"
+                className="flex items-center gap-1 text-sm font-medium text-foreground/80 hover:text-foreground"
+              >
+                {t("advanced")}
+                <svg
+                  className={`h-4 w-4 transition-transform ${advancedOpen ? "rotate-180" : ""}`}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                  focusable="false"
+                >
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </button>
+
+              {advancedOpen && (
+                <div id="advanced-trip-prefs" className="mt-4 flex flex-wrap items-end gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2 text-foreground/80">
+                      {t("dailyTimeRange")}
+                      <span className="ml-1 text-xs text-muted-foreground">{t("optional")}</span>
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <Controller
+                        name="startTime"
+                        control={form.control}
+                        render={({ field }) => (
+                          <TimeSelect
+                            value={field.value}
+                            onChange={field.onChange}
+                            aria-label={t("startTimeLabel")}
+                            disabled={isLoading}
+                          />
+                        )}
+                      />
+                      <span className="text-sm text-muted-foreground">–</span>
+                      <Controller
+                        name="endTime"
+                        control={form.control}
+                        render={({ field }) => (
+                          <TimeSelect
+                            value={field.value}
+                            onChange={field.onChange}
+                            aria-label={t("endTimeLabel")}
+                            disabled={isLoading}
+                          />
+                        )}
+                      />
+                    </div>
+                    {(form.formState.errors.startTime || form.formState.errors.endTime) && (
+                      <p className="text-xs text-destructive mt-1">
+                        {(
+                          form.formState.errors.startTime ?? form.formState.errors.endTime
+                        )?.message?.toString()}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2 text-foreground/80">
+                      {t("transportMode")}
+                    </label>
+                    <Controller
+                      name="transportMode"
+                      control={form.control}
+                      render={({ field }) => (
+                        <select
+                          value={field.value}
+                          onChange={(event) => field.onChange(event.target.value as TransportMode)}
+                          disabled={isLoading}
+                          aria-label={t("transportMode")}
+                          className="bg-background border border-border rounded px-3 h-9 text-sm cursor-pointer"
+                        >
+                          {TRANSPORT_OPTIONS.map((mode) => (
+                            <option key={mode} value={mode}>
+                              {tp(`transportMode.${mode}`)}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* General Error Message */}

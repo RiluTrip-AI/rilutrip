@@ -29,7 +29,8 @@
     "noteMaxLength": "Note must be at most 500 characters",
     "descriptionMaxLength": "Preferences must be at most 1000 characters",
     "pastDateNotAllowed": "Cannot select past dates",
-    "dateTooLong": "Trip duration cannot exceed 14 days"
+    "dateTooLong": "Trip duration cannot exceed 14 days",
+    "endTimeAfterStart": "End time must be after start time"
   },
   "landing": {
     "hero": {
@@ -47,6 +48,12 @@
       "generating": "Generating...",
       "itineraryLimitError": "You have reached your itinerary limit for the current plan.",
       "createError": "Failed to create itinerary. Please try again.",
+      "advanced": "Advanced",
+      "dailyTimeRange": "Daily time range",
+      "startTimeLabel": "Start time",
+      "endTimeLabel": "End time",
+      "transportMode": "Transport mode",
+      "optional": "(optional)",
       "perfectArrangeButton": "Perfect Arrangement",
       "autoOptimizing": "Optimizing routes..."
     },

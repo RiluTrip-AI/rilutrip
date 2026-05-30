@@ -186,6 +186,87 @@ describe("TripForm - Form Validation", () => {
     // in test/validation/zod-i18n-integration.test.ts
   });
 
+  it("does not append an advanced-prefs hint when the section is never opened", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", is_anonymous: false });
+    createItineraryMetadataMock.mockResolvedValue({ id: "itin-1" });
+
+    render(<TripForm />);
+    fireEvent.change(screen.getByPlaceholderText(/destinationPlaceholder/i), {
+      target: { value: "Tokyo" },
+    });
+    fireEvent.click(screen.getByTestId("mock-date-picker"));
+    fireEvent.click(screen.getByRole("button", { name: /generateButton/i }));
+
+    await waitFor(() => expect(createItineraryMetadataMock).toHaveBeenCalled());
+    const arg = createItineraryMetadataMock.mock.calls[0][0];
+    expect(arg.description).toBeUndefined();
+  });
+
+  it("does not append a hint when the advanced section is opened but all defaults are kept", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", is_anonymous: false });
+    createItineraryMetadataMock.mockResolvedValue({ id: "itin-1" });
+
+    render(<TripForm />);
+    fireEvent.change(screen.getByPlaceholderText(/destinationPlaceholder/i), {
+      target: { value: "Sapporo" },
+    });
+    fireEvent.click(screen.getByTestId("mock-date-picker"));
+    fireEvent.click(screen.getByRole("button", { name: /Advanced/i }));
+
+    fireEvent.click(screen.getByRole("button", { name: /generateButton/i }));
+
+    await waitFor(() => expect(createItineraryMetadataMock).toHaveBeenCalled());
+    const arg = createItineraryMetadataMock.mock.calls[0][0];
+    expect(arg.description).toBeUndefined();
+  });
+
+  it("appends a hint to description when user changes transport mode", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", is_anonymous: false });
+    createItineraryMetadataMock.mockResolvedValue({ id: "itin-1" });
+
+    render(<TripForm />);
+    fireEvent.change(screen.getByPlaceholderText(/destinationPlaceholder/i), {
+      target: { value: "Kyoto" },
+    });
+    fireEvent.click(screen.getByTestId("mock-date-picker"));
+    fireEvent.click(screen.getByRole("button", { name: /Advanced/i }));
+    fireEvent.change(screen.getByLabelText("Transport mode"), {
+      target: { value: "walking" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /generateButton/i }));
+
+    await waitFor(() => expect(createItineraryMetadataMock).toHaveBeenCalled());
+    const arg = createItineraryMetadataMock.mock.calls[0][0];
+    expect(arg.description).toContain("Walking");
+    expect(arg.description).toContain("daily window of");
+  });
+
+  it("keeps user-typed description before the appended hint when both are present", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", is_anonymous: false });
+    createItineraryMetadataMock.mockResolvedValue({ id: "itin-1" });
+
+    render(<TripForm />);
+    fireEvent.change(screen.getByPlaceholderText(/destinationPlaceholder/i), {
+      target: { value: "Osaka" },
+    });
+    fireEvent.change(screen.getByPlaceholderText(/descriptionPlaceholder/i), {
+      target: { value: "Foodie trip" },
+    });
+    fireEvent.click(screen.getByTestId("mock-date-picker"));
+    fireEvent.click(screen.getByRole("button", { name: /Advanced/i }));
+    fireEvent.change(screen.getByLabelText("Transport mode"), {
+      target: { value: "walking" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /generateButton/i }));
+
+    await waitFor(() => expect(createItineraryMetadataMock).toHaveBeenCalled());
+    const arg = createItineraryMetadataMock.mock.calls[0][0];
+    expect(arg.description?.startsWith("Foodie trip")).toBe(true);
+    expect(arg.description).toContain("Walking");
+  });
+
   it("shows a dedicated itinerary-limit error message when the tier cap is reached", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "user-1" });
     createItineraryMetadataMock.mockRejectedValue(new ItineraryLimitError());
