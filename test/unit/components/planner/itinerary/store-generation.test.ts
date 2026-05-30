@@ -82,6 +82,62 @@ describe("store startGeneration / stopGeneration", () => {
     expect(useItineraryStore.getState().isGenerating).toBe(true);
   });
 
+  it("reconciles against the DB when streaming completes, loading day-level metadata", async () => {
+    resetStore({ itinerary: { ...baseItinerary, status: "draft", days: [] } });
+
+    // The stream only carries activities; day metadata is persisted server-side
+    // and must come from the authoritative DB record loaded on completion.
+    const dbItinerary: Itinerary = {
+      ...baseItinerary,
+      status: "completed",
+      days: [
+        {
+          day_number: 1,
+          start_time: "08:00",
+          end_time: "21:00",
+          transport_mode: "transit",
+          activities: [],
+        },
+      ],
+    };
+
+    mocks.streamItinerary.mockImplementation(
+      async (_id: string, _locale: string, _onActivity: unknown, onComplete: () => void) => {
+        onComplete();
+      },
+    );
+    mocks.loadItinerary.mockResolvedValue(dbItinerary);
+
+    await useItineraryStore.getState().startGeneration("itin-1", "en");
+
+    expect(mocks.loadItinerary).toHaveBeenCalledWith("itin-1");
+    const state = useItineraryStore.getState();
+    expect(state.isGenerating).toBe(false);
+    expect(state.itinerary?.days[0]).toMatchObject({
+      start_time: "08:00",
+      end_time: "21:00",
+      transport_mode: "transit",
+    });
+  });
+
+  it("keeps the streamed itinerary if the post-completion reload fails", async () => {
+    const streamed = { ...baseItinerary, status: "draft" as const, days: [] };
+    resetStore({ itinerary: streamed });
+
+    mocks.streamItinerary.mockImplementation(
+      async (_id: string, _locale: string, _onActivity: unknown, onComplete: () => void) => {
+        onComplete();
+      },
+    );
+    mocks.loadItinerary.mockRejectedValue(new Error("network"));
+
+    await useItineraryStore.getState().startGeneration("itin-1", "en");
+
+    const state = useItineraryStore.getState();
+    expect(state.isGenerating).toBe(false);
+    expect(state.itinerary).not.toBeNull();
+  });
+
   it("uses polling (not streaming) when itinerary.status === 'generating'", async () => {
     resetStore({ itinerary: { ...baseItinerary, status: "generating" } });
     mocks.loadItinerary.mockResolvedValue({ ...baseItinerary, status: "generating" });
