@@ -225,15 +225,17 @@ Deno.serve(async (req) => {
           }
         }
 
-        // Track days and activities for DB save
+        // Track days and activities for DB save. Day-level scalars stored here
+        // are already sanitized (set at each $.itinerary.* close event), so the
+        // final DB save can use this map directly without re-validating.
         const dayMap = new Map<
           number,
           {
             day_number: number;
             activities: object[];
-            start_time?: unknown;
-            end_time?: unknown;
-            transport_mode?: unknown;
+            start_time?: string;
+            end_time?: string;
+            transport_mode?: string;
           }
         >();
 
@@ -247,16 +249,14 @@ Deno.serve(async (req) => {
         // Track async resolution tasks before saving
         const pendingResolutions: Promise<void>[] = [];
 
-        // @streamparser/json: fire onValue for each complete activity object as
-        // well as the day-level scalar fields. `$.itinerary.*.activities.*`
-        // matches each activity; the scalar paths match each day's metadata.
+        // @streamparser/json: fire onValue for each complete activity AND for
+        // each whole day object as it closes. Activities stream as they arrive
+        // (existing behavior); day-level scalars are read from the whole-day
+        // value, sanitized once at close, then both stored and emitted via SSE
+        // — so the frontend can fill them in during streaming instead of
+        // showing placeholders until refresh.
         const parser = new JSONParser({
-          paths: [
-            "$.itinerary.*.activities.*",
-            "$.itinerary.*.start_time",
-            "$.itinerary.*.end_time",
-            "$.itinerary.*.transport_mode",
-          ],
+          paths: ["$.itinerary.*.activities.*", "$.itinerary.*"],
         });
 
         parser.onValue = ({
@@ -268,12 +268,29 @@ Deno.serve(async (req) => {
           key?: string | number;
           stack: Array<{ key?: string | number }>;
         }) => {
-          // Day-level scalar fields live directly on the day object; stack[2]
-          // is the day object whose key is its 0-based index in the itinerary.
-          if (key === "start_time" || key === "end_time" || key === "transport_mode") {
-            const dayIndex = stack[2]?.key;
-            if (typeof dayIndex !== "number") return;
-            ensureDay(dayIndex + 1)[key] = value;
+          // Whole-day object closed: stack = [root, "itinerary"], `key` is the
+          // day's 0-based index in the itinerary array. Sanitize the day's
+          // metadata once at this trust boundary, store sanitized values into
+          // the dayMap, and emit a day_meta SSE event so the frontend updates
+          // in-memory state during streaming.
+          if (stack.length === 2 && stack[1]?.key === "itinerary") {
+            const dayObj = value as {
+              day_number?: number;
+              start_time?: unknown;
+              end_time?: unknown;
+              transport_mode?: unknown;
+            };
+            const day_number =
+              typeof dayObj.day_number === "number" && dayObj.day_number > 0
+                ? dayObj.day_number
+                : typeof key === "number"
+                  ? key + 1
+                  : null;
+            if (day_number === null) return;
+
+            const sanitized = sanitizeDayMeta(dayObj);
+            Object.assign(ensureDay(day_number), sanitized);
+            emitSSE("day_meta", { day_number, ...sanitized });
             return;
           }
 
@@ -397,15 +414,9 @@ Deno.serve(async (req) => {
           // Wait for all inline resolution tasks to complete
           await Promise.all(pendingResolutions);
 
-          // Convert map to sorted array
-          const allDays = Array.from(dayMap.values())
-            .sort((a, b) => a.day_number - b.day_number)
-            .map(({ day_number, activities, start_time, end_time, transport_mode }) => ({
-              day_number,
-              activities,
-              // Validate AI-provided metadata; invalid/missing values are dropped, not defaulted.
-              ...sanitizeDayMeta({ start_time, end_time, transport_mode }),
-            }));
+          // dayMap entries already hold sanitized day-level metadata (set at
+          // each $.itinerary.* close event); just sort and save.
+          const allDays = Array.from(dayMap.values()).sort((a, b) => a.day_number - b.day_number);
 
           // Save complete itinerary to DB
           const { error: updateError } = await supabaseAdmin

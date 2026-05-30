@@ -15,11 +15,17 @@ import { extractJSON } from "./parser";
 import { parseOperations, type OperationsUpdate } from "./operations";
 import { getAccessToken } from "@/lib/supabase/client";
 import { fetchEventSource } from "@microsoft/fetch-event-source";
-import type { Activity } from "@/types/itinerary";
+import type { Activity, TransportMode } from "@/types/itinerary";
 
 export type SSEActivityEvent = {
   day_number: number;
   activity: Activity;
+};
+export type SSEDayMetaEvent = {
+  day_number: number;
+  start_time?: string;
+  end_time?: string;
+  transport_mode?: TransportMode;
 };
 export type SSEErrorEvent = { message: string };
 
@@ -56,6 +62,7 @@ export class AIClient {
     itineraryId: string,
     locale: string,
     onActivity: (data: SSEActivityEvent) => void,
+    onDayMeta: (data: SSEDayMetaEvent) => void,
     onComplete: () => void,
     onError: (data: SSEErrorEvent) => void,
     signal: AbortSignal,
@@ -86,6 +93,9 @@ export class AIClient {
         if (msg.event === "activity") {
           const data = JSON.parse(msg.data) as SSEActivityEvent;
           onActivity(data);
+        } else if (msg.event === "day_meta") {
+          const data = JSON.parse(msg.data) as SSEDayMetaEvent;
+          onDayMeta(data);
         } else if (msg.event === "complete") {
           onComplete();
         } else if (msg.event === "error") {

@@ -841,6 +841,7 @@ async function startStreamingInternal(
       itineraryId,
       locale,
       (data) => appendStreamedActivityInternal(data.day_number, data.activity, set),
+      (data) => applyStreamedDayMetaInternal(data, set),
       () => {
         set({ isGenerating: false, generationAbortController: null });
       },
@@ -962,6 +963,51 @@ function appendStreamedActivityInternal(
       };
     } else {
       days.push({ day_number: dayNumber, activities: [activity] });
+      days.sort((a, b) => a.day_number - b.day_number);
+    }
+
+    return {
+      itinerary: {
+        ...state.itinerary,
+        days,
+        updated_at: new Date().toISOString(),
+      },
+    };
+  });
+}
+
+function applyStreamedDayMetaInternal(
+  data: {
+    day_number: number;
+    start_time?: string;
+    end_time?: string;
+    transport_mode?: TransportMode;
+  },
+  set: StoreSet,
+): void {
+  set((state) => {
+    if (!state.itinerary) return state;
+
+    const dayPatch = {
+      ...(data.start_time !== undefined && { start_time: data.start_time }),
+      ...(data.end_time !== undefined && { end_time: data.end_time }),
+      ...(data.transport_mode !== undefined && { transport_mode: data.transport_mode }),
+    };
+
+    const days = [...state.itinerary.days];
+    const existingDayIdx = days.findIndex((d) => d.day_number === data.day_number);
+
+    if (existingDayIdx !== -1) {
+      days[existingDayIdx] = { ...days[existingDayIdx], ...dayPatch };
+    } else {
+      // day_meta can arrive before any activity for that day because activity
+      // SSE is deferred until place-resolution finishes while the parser may
+      // have already seen the day object close.
+      days.push({
+        day_number: data.day_number,
+        activities: [] as Activity[],
+        ...dayPatch,
+      });
       days.sort((a, b) => a.day_number - b.day_number);
     }
 
