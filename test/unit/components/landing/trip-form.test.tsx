@@ -186,6 +186,138 @@ describe("TripForm - Form Validation", () => {
     // in test/validation/zod-i18n-integration.test.ts
   });
 
+  it("does not append an advanced-prefs hint when the section is never opened", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", is_anonymous: false });
+    createItineraryMetadataMock.mockResolvedValue({ id: "itin-1" });
+
+    render(<TripForm />);
+    fireEvent.change(screen.getByPlaceholderText(/destinationPlaceholder/i), {
+      target: { value: "Tokyo" },
+    });
+    fireEvent.click(screen.getByTestId("mock-date-picker"));
+    fireEvent.click(screen.getByRole("button", { name: /generateButton/i }));
+
+    await waitFor(() => expect(createItineraryMetadataMock).toHaveBeenCalled());
+    const arg = createItineraryMetadataMock.mock.calls[0][0];
+    expect(arg.description).toBeUndefined();
+  });
+
+  it("does not append a hint when the advanced section is opened but all defaults are kept", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", is_anonymous: false });
+    createItineraryMetadataMock.mockResolvedValue({ id: "itin-1" });
+
+    render(<TripForm />);
+    fireEvent.change(screen.getByPlaceholderText(/destinationPlaceholder/i), {
+      target: { value: "Sapporo" },
+    });
+    fireEvent.click(screen.getByTestId("mock-date-picker"));
+    fireEvent.click(screen.getByRole("button", { name: /Advanced/i }));
+
+    fireEvent.click(screen.getByRole("button", { name: /generateButton/i }));
+
+    await waitFor(() => expect(createItineraryMetadataMock).toHaveBeenCalled());
+    const arg = createItineraryMetadataMock.mock.calls[0][0];
+    expect(arg.description).toBeUndefined();
+  });
+
+  it("appends a transport-only hint when only transport mode is filled", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", is_anonymous: false });
+    createItineraryMetadataMock.mockResolvedValue({ id: "itin-1" });
+
+    render(<TripForm />);
+    fireEvent.change(screen.getByPlaceholderText(/destinationPlaceholder/i), {
+      target: { value: "Kyoto" },
+    });
+    fireEvent.click(screen.getByTestId("mock-date-picker"));
+    fireEvent.click(screen.getByRole("button", { name: /Advanced/i }));
+    fireEvent.change(screen.getByLabelText("Transport mode"), {
+      target: { value: "walking" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /generateButton/i }));
+
+    await waitFor(() => expect(createItineraryMetadataMock).toHaveBeenCalled());
+    const arg = createItineraryMetadataMock.mock.calls[0][0];
+    expect(arg.description).toBe("Please prefer Walking when feasible.");
+  });
+
+  function pickTime(groupLabel: string, hh: string, mm: string) {
+    fireEvent.click(screen.getByRole("button", { name: `${groupLabel} hour` }));
+    fireEvent.click(screen.getByRole("option", { name: hh }));
+    fireEvent.click(screen.getByRole("button", { name: `${groupLabel} minute` }));
+    fireEvent.click(screen.getByRole("option", { name: mm }));
+  }
+
+  it("appends a combined hint when both time range and transport are filled", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", is_anonymous: false });
+    createItineraryMetadataMock.mockResolvedValue({ id: "itin-1" });
+
+    render(<TripForm />);
+    fireEvent.change(screen.getByPlaceholderText(/destinationPlaceholder/i), {
+      target: { value: "Nara" },
+    });
+    fireEvent.click(screen.getByTestId("mock-date-picker"));
+    fireEvent.click(screen.getByRole("button", { name: /Advanced/i }));
+    pickTime("Start time", "08", "00");
+    pickTime("End time", "22", "00");
+    fireEvent.change(screen.getByLabelText("Transport mode"), {
+      target: { value: "walking" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /generateButton/i }));
+
+    await waitFor(() => expect(createItineraryMetadataMock).toHaveBeenCalled());
+    const arg = createItineraryMetadataMock.mock.calls[0][0];
+    expect(arg.description).toContain("daily window of 08:00–22:00");
+    expect(arg.description).toContain("Walking");
+  });
+
+  it("does not append a hint when only the hour of start time is filled", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", is_anonymous: false });
+    createItineraryMetadataMock.mockResolvedValue({ id: "itin-1" });
+
+    render(<TripForm />);
+    fireEvent.change(screen.getByPlaceholderText(/destinationPlaceholder/i), {
+      target: { value: "Nagoya" },
+    });
+    fireEvent.click(screen.getByTestId("mock-date-picker"));
+    fireEvent.click(screen.getByRole("button", { name: /Advanced/i }));
+    // Only set the hour of Start time — minute stays "--" so TimeSelect emits ""
+    fireEvent.click(screen.getByRole("button", { name: "Start time hour" }));
+    fireEvent.click(screen.getByRole("option", { name: "08" }));
+
+    fireEvent.click(screen.getByRole("button", { name: /generateButton/i }));
+
+    await waitFor(() => expect(createItineraryMetadataMock).toHaveBeenCalled());
+    const arg = createItineraryMetadataMock.mock.calls[0][0];
+    expect(arg.description).toBeUndefined();
+  });
+
+  it("keeps user-typed description before the appended hint when both are present", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", is_anonymous: false });
+    createItineraryMetadataMock.mockResolvedValue({ id: "itin-1" });
+
+    render(<TripForm />);
+    fireEvent.change(screen.getByPlaceholderText(/destinationPlaceholder/i), {
+      target: { value: "Osaka" },
+    });
+    fireEvent.change(screen.getByPlaceholderText(/descriptionPlaceholder/i), {
+      target: { value: "Foodie trip" },
+    });
+    fireEvent.click(screen.getByTestId("mock-date-picker"));
+    fireEvent.click(screen.getByRole("button", { name: /Advanced/i }));
+    fireEvent.change(screen.getByLabelText("Transport mode"), {
+      target: { value: "walking" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /generateButton/i }));
+
+    await waitFor(() => expect(createItineraryMetadataMock).toHaveBeenCalled());
+    const arg = createItineraryMetadataMock.mock.calls[0][0];
+    expect(arg.description?.startsWith("Foodie trip")).toBe(true);
+    expect(arg.description).toContain("Walking");
+  });
+
   it("shows a dedicated itinerary-limit error message when the tier cap is reached", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "user-1" });
     createItineraryMetadataMock.mockRejectedValue(new ItineraryLimitError());

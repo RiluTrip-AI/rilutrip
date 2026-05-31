@@ -1,10 +1,13 @@
 import { z } from "zod";
+import { TransportModeSchema } from "./itinerary";
 
 // ============================================================================
 // Schema Factory Types
 // ============================================================================
 
 export type TranslationFunction = (key: string) => string;
+
+const TIME_PATTERN = /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/;
 
 // ============================================================================
 // Landing Page Data Forms
@@ -23,6 +26,14 @@ export const createTripFormSchema = (t: TranslationFunction) =>
         to: z.date().optional(),
       }),
       description: z.string().max(1000, t("validation.descriptionMaxLength")).optional(),
+      // Advanced-prefs fields. Empty string (or absent) means "not set" so
+      // the UI can show placeholders instead of preselected defaults; format
+      // and cross-field checks live in superRefine and skip blank values.
+      // `.optional()` lets callers omit these (test fixtures, future inputs)
+      // without tripping schema-level "required" errors.
+      startTime: z.string().optional(),
+      endTime: z.string().optional(),
+      transportMode: z.union([z.literal(""), TransportModeSchema]).optional(),
     })
     .superRefine((data, ctx) => {
       const { from, to } = data.dates;
@@ -73,6 +84,31 @@ export const createTripFormSchema = (t: TranslationFunction) =>
           code: "custom",
           message: t("validation.dateTooLong"),
           path: ["dates"],
+        });
+      }
+
+      // Advanced-prefs time validation. Empty/undefined means "not set" and
+      // is silent; format errors only fire on actually-typed values, and the
+      // cross-field start < end check only fires when both are filled.
+      if (data.startTime && !TIME_PATTERN.test(data.startTime)) {
+        ctx.addIssue({
+          code: "custom",
+          message: t("validation.timeInvalidFormat"),
+          path: ["startTime"],
+        });
+      }
+      if (data.endTime && !TIME_PATTERN.test(data.endTime)) {
+        ctx.addIssue({
+          code: "custom",
+          message: t("validation.timeInvalidFormat"),
+          path: ["endTime"],
+        });
+      }
+      if (data.startTime && data.endTime && data.startTime >= data.endTime) {
+        ctx.addIssue({
+          code: "custom",
+          message: t("validation.endTimeAfterStart"),
+          path: ["endTime"],
         });
       }
     });
