@@ -241,6 +241,13 @@ describe("TripForm - Form Validation", () => {
     expect(arg.description).toBe("Please prefer Walking when feasible.");
   });
 
+  function pickTime(groupLabel: string, hh: string, mm: string) {
+    fireEvent.click(screen.getByRole("button", { name: `${groupLabel} hour` }));
+    fireEvent.click(screen.getByRole("option", { name: hh }));
+    fireEvent.click(screen.getByRole("button", { name: `${groupLabel} minute` }));
+    fireEvent.click(screen.getByRole("option", { name: mm }));
+  }
+
   it("appends a combined hint when both time range and transport are filled", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "user-1", is_anonymous: false });
     createItineraryMetadataMock.mockResolvedValue({ id: "itin-1" });
@@ -251,8 +258,8 @@ describe("TripForm - Form Validation", () => {
     });
     fireEvent.click(screen.getByTestId("mock-date-picker"));
     fireEvent.click(screen.getByRole("button", { name: /Advanced/i }));
-    fireEvent.change(screen.getByLabelText("Start time"), { target: { value: "08:00" } });
-    fireEvent.change(screen.getByLabelText("End time"), { target: { value: "22:00" } });
+    pickTime("Start time", "08", "00");
+    pickTime("End time", "22", "00");
     fireEvent.change(screen.getByLabelText("Transport mode"), {
       target: { value: "walking" },
     });
@@ -265,7 +272,7 @@ describe("TripForm - Form Validation", () => {
     expect(arg.description).toContain("Walking");
   });
 
-  it("does not append a hint when only one of start/end time is filled", async () => {
+  it("does not append a hint when only the hour of start time is filled", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "user-1", is_anonymous: false });
     createItineraryMetadataMock.mockResolvedValue({ id: "itin-1" });
 
@@ -275,8 +282,9 @@ describe("TripForm - Form Validation", () => {
     });
     fireEvent.click(screen.getByTestId("mock-date-picker"));
     fireEvent.click(screen.getByRole("button", { name: /Advanced/i }));
-    fireEvent.change(screen.getByLabelText("Start time"), { target: { value: "08:00" } });
-    // No end time, no transport mode
+    // Only set the hour of Start time — minute stays "--" so TimeSelect emits ""
+    fireEvent.click(screen.getByRole("button", { name: "Start time hour" }));
+    fireEvent.click(screen.getByRole("option", { name: "08" }));
 
     fireEvent.click(screen.getByRole("button", { name: /generateButton/i }));
 
