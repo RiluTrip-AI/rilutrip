@@ -220,7 +220,7 @@ describe("TripForm - Form Validation", () => {
     expect(arg.description).toBeUndefined();
   });
 
-  it("appends a hint to description when user changes transport mode", async () => {
+  it("appends a transport-only hint when only transport mode is filled", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "user-1", is_anonymous: false });
     createItineraryMetadataMock.mockResolvedValue({ id: "itin-1" });
 
@@ -238,8 +238,51 @@ describe("TripForm - Form Validation", () => {
 
     await waitFor(() => expect(createItineraryMetadataMock).toHaveBeenCalled());
     const arg = createItineraryMetadataMock.mock.calls[0][0];
+    expect(arg.description).toBe("Please prefer Walking when feasible.");
+  });
+
+  it("appends a combined hint when both time range and transport are filled", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", is_anonymous: false });
+    createItineraryMetadataMock.mockResolvedValue({ id: "itin-1" });
+
+    render(<TripForm />);
+    fireEvent.change(screen.getByPlaceholderText(/destinationPlaceholder/i), {
+      target: { value: "Nara" },
+    });
+    fireEvent.click(screen.getByTestId("mock-date-picker"));
+    fireEvent.click(screen.getByRole("button", { name: /Advanced/i }));
+    fireEvent.change(screen.getByLabelText("Start time"), { target: { value: "08:00" } });
+    fireEvent.change(screen.getByLabelText("End time"), { target: { value: "22:00" } });
+    fireEvent.change(screen.getByLabelText("Transport mode"), {
+      target: { value: "walking" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /generateButton/i }));
+
+    await waitFor(() => expect(createItineraryMetadataMock).toHaveBeenCalled());
+    const arg = createItineraryMetadataMock.mock.calls[0][0];
+    expect(arg.description).toContain("daily window of 08:00–22:00");
     expect(arg.description).toContain("Walking");
-    expect(arg.description).toContain("daily window of");
+  });
+
+  it("does not append a hint when only one of start/end time is filled", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", is_anonymous: false });
+    createItineraryMetadataMock.mockResolvedValue({ id: "itin-1" });
+
+    render(<TripForm />);
+    fireEvent.change(screen.getByPlaceholderText(/destinationPlaceholder/i), {
+      target: { value: "Nagoya" },
+    });
+    fireEvent.click(screen.getByTestId("mock-date-picker"));
+    fireEvent.click(screen.getByRole("button", { name: /Advanced/i }));
+    fireEvent.change(screen.getByLabelText("Start time"), { target: { value: "08:00" } });
+    // No end time, no transport mode
+
+    fireEvent.click(screen.getByRole("button", { name: /generateButton/i }));
+
+    await waitFor(() => expect(createItineraryMetadataMock).toHaveBeenCalled());
+    const arg = createItineraryMetadataMock.mock.calls[0][0];
+    expect(arg.description).toBeUndefined();
   });
 
   it("keeps user-typed description before the appended hint when both are present", async () => {

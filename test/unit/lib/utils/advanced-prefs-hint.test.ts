@@ -1,75 +1,93 @@
 import { describe, it, expect } from "vitest";
-import {
-  buildAdvancedPrefsHint,
-  DEFAULT_ADVANCED_START_TIME,
-  DEFAULT_ADVANCED_END_TIME,
-  DEFAULT_ADVANCED_TRANSPORT_MODE,
-} from "@/lib/utils/advanced-prefs-hint";
+import { buildAdvancedPrefsHint } from "@/lib/utils/advanced-prefs-hint";
 
 describe("buildAdvancedPrefsHint", () => {
-  const baseInput = {
-    startTime: DEFAULT_ADVANCED_START_TIME,
-    endTime: DEFAULT_ADVANCED_END_TIME,
-    transportMode: DEFAULT_ADVANCED_TRANSPORT_MODE,
+  const empty = {
+    startTime: "",
+    endTime: "",
+    transportMode: "" as const,
     locale: "en",
-    transportModeLabel: "Transit",
+    transportModeLabel: "",
   };
 
-  it("returns null when all values are at defaults", () => {
-    const hint = buildAdvancedPrefsHint(baseInput);
-    expect(hint).toBeNull();
+  it("returns null when every field is empty", () => {
+    expect(buildAdvancedPrefsHint(empty)).toBeNull();
   });
 
-  it("returns en hint when any field differs from default (en locale)", () => {
+  it("returns null when only one of start/end is filled (incomplete pair)", () => {
+    expect(buildAdvancedPrefsHint({ ...empty, startTime: "09:00" })).toBeNull();
+    expect(buildAdvancedPrefsHint({ ...empty, endTime: "21:00" })).toBeNull();
+  });
+
+  it("emits time-only sentence when only the time range is filled (en)", () => {
     const hint = buildAdvancedPrefsHint({
-      ...baseInput,
+      ...empty,
+      startTime: "08:00",
+      endTime: "22:00",
+    });
+    expect(hint).toBe("Please plan with a daily window of 08:00–22:00.");
+  });
+
+  it("emits time-only sentence when only the time range is filled (zh-TW)", () => {
+    const hint = buildAdvancedPrefsHint({
+      ...empty,
+      locale: "zh-TW",
+      startTime: "08:00",
+      endTime: "22:00",
+    });
+    expect(hint).toBe("請以每日 08:00–22:00安排行程。");
+  });
+
+  it("emits transport-only sentence when only transport mode is filled (en)", () => {
+    const hint = buildAdvancedPrefsHint({
+      ...empty,
       transportMode: "walking",
       transportModeLabel: "Walking",
     });
+    expect(hint).toBe("Please prefer Walking when feasible.");
+  });
+
+  it("emits transport-only sentence when only transport mode is filled (zh-TW)", () => {
+    const hint = buildAdvancedPrefsHint({
+      ...empty,
+      locale: "zh-TW",
+      transportMode: "walking",
+      transportModeLabel: "步行",
+    });
+    expect(hint).toBe("請以交通方式個人偏好為步行安排行程。");
+  });
+
+  it("combines both pieces when time range and transport are both filled (en)", () => {
+    const hint = buildAdvancedPrefsHint({
+      startTime: "08:00",
+      endTime: "22:00",
+      transportMode: "walking",
+      transportModeLabel: "Walking",
+      locale: "en",
+    });
     expect(hint).toBe(
-      "Please plan with a daily window of 09:00–21:00 and prefer Walking when feasible.",
+      "Please plan with a daily window of 08:00–22:00 and prefer Walking when feasible.",
     );
   });
 
-  it("returns zh-TW hint with localized transport label when locale is zh-TW", () => {
+  it("combines both pieces in zh-TW", () => {
     const hint = buildAdvancedPrefsHint({
-      ...baseInput,
-      locale: "zh-TW",
       startTime: "08:00",
       endTime: "22:00",
       transportMode: "walking",
       transportModeLabel: "步行",
+      locale: "zh-TW",
     });
     expect(hint).toBe("請以每日 08:00–22:00、交通方式個人偏好為步行安排行程。");
   });
 
-  it("triggers hint when only one field changed (start time)", () => {
+  it("falls back to en formatting when locale is neither en nor zh-TW", () => {
     const hint = buildAdvancedPrefsHint({
-      ...baseInput,
-      startTime: "07:30",
-    });
-    expect(hint).not.toBeNull();
-    expect(hint).toContain("07:30");
-  });
-
-  it("triggers hint when only end time changed", () => {
-    const hint = buildAdvancedPrefsHint({
-      ...baseInput,
-      endTime: "23:00",
-    });
-    expect(hint).not.toBeNull();
-    expect(hint).toContain("23:00");
-  });
-
-  it("falls back to en format when locale is neither en nor zh-TW", () => {
-    const hint = buildAdvancedPrefsHint({
-      ...baseInput,
+      ...empty,
       locale: "ja",
       transportMode: "driving",
       transportModeLabel: "Driving",
     });
-    expect(hint).toBe(
-      "Please plan with a daily window of 09:00–21:00 and prefer Driving when feasible.",
-    );
+    expect(hint).toBe("Please prefer Driving when feasible.");
   });
 });

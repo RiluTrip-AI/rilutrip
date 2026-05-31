@@ -1,10 +1,5 @@
 import { z } from "zod";
 import { TransportModeSchema } from "./itinerary";
-import {
-  DEFAULT_ADVANCED_START_TIME,
-  DEFAULT_ADVANCED_END_TIME,
-  DEFAULT_ADVANCED_TRANSPORT_MODE,
-} from "@/lib/utils/advanced-prefs-hint";
 
 // ============================================================================
 // Schema Factory Types
@@ -31,17 +26,14 @@ export const createTripFormSchema = (t: TranslationFunction) =>
         to: z.date().optional(),
       }),
       description: z.string().max(1000, t("validation.descriptionMaxLength")).optional(),
-      // Advanced-prefs fields. Defaults keep them silent (no hint appended) until
-      // the user actually changes them — see lib/utils/advanced-prefs-hint.
-      startTime: z
-        .string()
-        .regex(TIME_PATTERN, t("validation.timeInvalidFormat"))
-        .default(DEFAULT_ADVANCED_START_TIME),
-      endTime: z
-        .string()
-        .regex(TIME_PATTERN, t("validation.timeInvalidFormat"))
-        .default(DEFAULT_ADVANCED_END_TIME),
-      transportMode: TransportModeSchema.default(DEFAULT_ADVANCED_TRANSPORT_MODE),
+      // Advanced-prefs fields. Empty string (or absent) means "not set" so
+      // the UI can show placeholders instead of preselected defaults; format
+      // and cross-field checks live in superRefine and skip blank values.
+      // `.optional()` lets callers omit these (test fixtures, future inputs)
+      // without tripping schema-level "required" errors.
+      startTime: z.string().optional(),
+      endTime: z.string().optional(),
+      transportMode: z.union([z.literal(""), TransportModeSchema]).optional(),
     })
     .superRefine((data, ctx) => {
       const { from, to } = data.dates;
@@ -95,7 +87,24 @@ export const createTripFormSchema = (t: TranslationFunction) =>
         });
       }
 
-      if (data.startTime >= data.endTime) {
+      // Advanced-prefs time validation. Empty/undefined means "not set" and
+      // is silent; format errors only fire on actually-typed values, and the
+      // cross-field start < end check only fires when both are filled.
+      if (data.startTime && !TIME_PATTERN.test(data.startTime)) {
+        ctx.addIssue({
+          code: "custom",
+          message: t("validation.timeInvalidFormat"),
+          path: ["startTime"],
+        });
+      }
+      if (data.endTime && !TIME_PATTERN.test(data.endTime)) {
+        ctx.addIssue({
+          code: "custom",
+          message: t("validation.timeInvalidFormat"),
+          path: ["endTime"],
+        });
+      }
+      if (data.startTime && data.endTime && data.startTime >= data.endTime) {
         ctx.addIssue({
           code: "custom",
           message: t("validation.endTimeAfterStart"),

@@ -14,12 +14,7 @@ import { LoginDialog } from "@/components/auth/login-dialog";
 import { getCurrentUser } from "@/lib/supabase/client";
 import { createItineraryMetadata, ItineraryLimitError } from "@/lib/supabase/itineraries";
 import { formatLocalDate } from "@/lib/utils/date";
-import {
-  buildAdvancedPrefsHint,
-  DEFAULT_ADVANCED_START_TIME,
-  DEFAULT_ADVANCED_END_TIME,
-  DEFAULT_ADVANCED_TRANSPORT_MODE,
-} from "@/lib/utils/advanced-prefs-hint";
+import { buildAdvancedPrefsHint } from "@/lib/utils/advanced-prefs-hint";
 import type { TransportMode } from "@/types/itinerary";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -49,9 +44,11 @@ export function TripForm() {
         from: undefined,
         to: undefined,
       },
-      startTime: DEFAULT_ADVANCED_START_TIME,
-      endTime: DEFAULT_ADVANCED_END_TIME,
-      transportMode: DEFAULT_ADVANCED_TRANSPORT_MODE,
+      // Advanced prefs start empty so the inputs render as placeholders;
+      // the user expressing nothing should not be surfaced to the AI.
+      startTime: "",
+      endTime: "",
+      transportMode: "",
     },
   });
 
@@ -82,7 +79,7 @@ export function TripForm() {
         endTime: data.endTime,
         transportMode: data.transportMode,
         locale,
-        transportModeLabel: tp(`transportMode.${data.transportMode}`),
+        transportModeLabel: data.transportMode ? tp(`transportMode.${data.transportMode}`) : "",
       });
       const baseDescription = data.description?.trim() ?? "";
       const finalDescription = [baseDescription, hint].filter(Boolean).join("\n\n") || undefined;
@@ -225,7 +222,7 @@ export function TripForm() {
                         control={form.control}
                         render={({ field }) => (
                           <TimeSelect
-                            value={field.value}
+                            value={field.value ?? ""}
                             onChange={field.onChange}
                             aria-label={t("startTimeLabel")}
                             disabled={isLoading}
@@ -238,7 +235,7 @@ export function TripForm() {
                         control={form.control}
                         render={({ field }) => (
                           <TimeSelect
-                            value={field.value}
+                            value={field.value ?? ""}
                             onChange={field.onChange}
                             aria-label={t("endTimeLabel")}
                             disabled={isLoading}
@@ -264,12 +261,15 @@ export function TripForm() {
                       control={form.control}
                       render={({ field }) => (
                         <select
-                          value={field.value}
-                          onChange={(event) => field.onChange(event.target.value as TransportMode)}
+                          value={field.value ?? ""}
+                          onChange={(event) =>
+                            field.onChange(event.target.value as TransportMode | "")
+                          }
                           disabled={isLoading}
                           aria-label={t("transportMode")}
                           className="bg-background border border-border rounded px-3 h-9 text-sm cursor-pointer"
                         >
+                          <option value="">—</option>
                           {TRANSPORT_OPTIONS.map((mode) => (
                             <option key={mode} value={mode}>
                               {tp(`transportMode.${mode}`)}

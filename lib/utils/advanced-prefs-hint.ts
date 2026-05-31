@@ -1,21 +1,19 @@
 import type { TransportMode } from "@/types/itinerary";
 
 /**
- * Defaults for the landing form's advanced preferences section.
+ * Inputs to the hint builder.
  *
- * These match the values shown when the user has not touched the section, and
- * are used to decide whether the user has actually expressed a preference
- * worth surfacing to the AI. If you change a default here, also update the
- * form's `defaultValues`.
+ * Each field uses empty string to mean "user has not set this" — that lets
+ * the form start with placeholder-looking inputs (no preselected defaults
+ * surfaced as preferences) while keeping the field types simple strings.
  */
-export const DEFAULT_ADVANCED_START_TIME = "09:00";
-export const DEFAULT_ADVANCED_END_TIME = "21:00";
-export const DEFAULT_ADVANCED_TRANSPORT_MODE: TransportMode = "transit";
-
 export interface AdvancedPrefsHintInput {
-  startTime: string;
-  endTime: string;
-  transportMode: TransportMode;
+  /** Empty/undefined means unset; otherwise HH:MM. */
+  startTime?: string;
+  /** Empty/undefined means unset; otherwise HH:MM. */
+  endTime?: string;
+  /** Empty/undefined means unset; otherwise a TransportMode value. */
+  transportMode?: TransportMode | "";
   /** Active app locale (e.g. "en" | "zh-TW"). Anything else falls back to en. */
   locale: string;
   /** Localized display name for transportMode (e.g. "Walking" / "步行"). */
@@ -24,29 +22,47 @@ export interface AdvancedPrefsHintInput {
 
 /**
  * Build a single sentence to append to the AI prompt's customPreferences
- * (= itinerary description). Returns null when every field is still at its
- * default — silence is correct because the user has expressed no preference.
+ * (= itinerary description). Returns null when the user has expressed
+ * nothing — every field empty, or only one of start/end time filled (an
+ * incomplete pair carries no useful instruction).
  *
- * The UI keeps the advanced section collapsed by default, so the only way for
- * any of these fields to differ from a default is for the user to have opened
- * the section and interacted with a control. That means "differs from default"
- * already captures the "user engaged" intent without a separate flag.
+ * Supports partial input: time range alone, transport mode alone, or both.
+ * Whatever the user actually filled goes into the sentence; whatever they
+ * skipped is silently omitted.
  *
- * The output is a clear instruction so the AI is unlikely to ignore it, while
- * still being a hint — sanitizeDayMeta in the edge function remains the source
- * of truth for what actually lands in the day-level metadata.
+ * The output is a clear instruction so the AI is unlikely to ignore it,
+ * while still being a hint — sanitizeDayMeta in the edge function remains
+ * the source of truth for what actually lands in the day-level metadata.
  */
 export function buildAdvancedPrefsHint(input: AdvancedPrefsHintInput): string | null {
-  const changed =
-    input.startTime !== DEFAULT_ADVANCED_START_TIME ||
-    input.endTime !== DEFAULT_ADVANCED_END_TIME ||
-    input.transportMode !== DEFAULT_ADVANCED_TRANSPORT_MODE;
-  if (!changed) return null;
+  // Treat empty string and undefined identically as "unset". Using truthy
+  // checks keeps the rest of the code branch-free.
+  const start = input.startTime || "";
+  const end = input.endTime || "";
+  const mode = input.transportMode || "";
 
-  const { startTime, endTime, transportModeLabel } = input;
+  const hasTimeRange = start !== "" && end !== "";
+  const hasTransport = mode !== "";
 
-  if (input.locale === "zh-TW") {
-    return `請以每日 ${startTime}–${endTime}、交通方式個人偏好為${transportModeLabel}安排行程。`;
+  if (!hasTimeRange && !hasTransport) return null;
+
+  const isZh = input.locale === "zh-TW";
+
+  if (isZh) {
+    const timePart = hasTimeRange ? `每日 ${start}–${end}` : "";
+    const transportPart = hasTransport ? `交通方式個人偏好為${input.transportModeLabel}` : "";
+    const body = [timePart, transportPart].filter(Boolean).join("、");
+    return `請以${body}安排行程。`;
   }
-  return `Please plan with a daily window of ${startTime}–${endTime} and prefer ${transportModeLabel} when feasible.`;
+
+  const timePart = hasTimeRange ? `a daily window of ${start}–${end}` : "";
+  const transportPart = hasTransport ? `prefer ${input.transportModeLabel} when feasible` : "";
+
+  if (hasTimeRange && hasTransport) {
+    return `Please plan with ${timePart} and ${transportPart}.`;
+  }
+  if (hasTimeRange) {
+    return `Please plan with ${timePart}.`;
+  }
+  return `Please ${transportPart}.`;
 }
