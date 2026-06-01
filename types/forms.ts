@@ -87,24 +87,49 @@ export const createTripFormSchema = (t: TranslationFunction) =>
         });
       }
 
-      // Advanced-prefs time validation. Empty/undefined means "not set" and
-      // is silent; format errors only fire on actually-typed values, and the
-      // cross-field start < end check only fires when both are filled.
-      if (data.startTime && !TIME_PATTERN.test(data.startTime)) {
+      // Advanced-prefs time validation. Each side is empty (silent), partial
+      // (one of HH/MM picked — the picker emits "HH:" or ":MM"), or complete.
+      // A partial side must be finished; one complete side with the other left
+      // empty is a half-specified range; start < end runs only when both are
+      // complete.
+      const classifyTime = (v?: string): "empty" | "partial" | "complete" =>
+        !v ? "empty" : TIME_PATTERN.test(v) ? "complete" : "partial";
+      const startState = classifyTime(data.startTime);
+      const endState = classifyTime(data.endTime);
+
+      if (startState === "partial") {
         ctx.addIssue({
           code: "custom",
-          message: t("validation.timeInvalidFormat"),
+          message: t("validation.timeIncomplete"),
           path: ["startTime"],
         });
       }
-      if (data.endTime && !TIME_PATTERN.test(data.endTime)) {
+      if (endState === "partial") {
         ctx.addIssue({
           code: "custom",
-          message: t("validation.timeInvalidFormat"),
+          message: t("validation.timeIncomplete"),
           path: ["endTime"],
         });
       }
-      if (data.startTime && data.endTime && data.startTime >= data.endTime) {
+      if (startState === "complete" && endState === "empty") {
+        ctx.addIssue({
+          code: "custom",
+          message: t("validation.timeRangeIncomplete"),
+          path: ["endTime"],
+        });
+      }
+      if (endState === "complete" && startState === "empty") {
+        ctx.addIssue({
+          code: "custom",
+          message: t("validation.timeRangeIncomplete"),
+          path: ["startTime"],
+        });
+      }
+      if (
+        startState === "complete" &&
+        endState === "complete" &&
+        data.startTime! >= data.endTime!
+      ) {
         ctx.addIssue({
           code: "custom",
           message: t("validation.endTimeAfterStart"),

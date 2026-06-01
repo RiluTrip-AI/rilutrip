@@ -19,6 +19,15 @@ function parseValue(value: string): { hh: string; mm: string } {
     const [hh, mm] = value.split(":");
     return { hh, mm };
   }
+  // Recover a half-filled "HH:" / ":MM" so a single chosen unit survives the
+  // parent's resync; the form schema is what flags the incomplete value.
+  if (value.includes(":")) {
+    const [rawHH, rawMM] = value.split(":");
+    return {
+      hh: HOURS.includes(rawHH) ? rawHH : "",
+      mm: (MINUTES as readonly string[]).includes(rawMM) ? rawMM : "",
+    };
+  }
   return { hh: "", mm: "" };
 }
 
@@ -111,9 +120,10 @@ function UnitDropdown({ value, options, onChange, disabled, ariaLabel }: UnitDro
 }
 
 /**
- * 24-hour HH/MM dropdown picker. Empty until both sides are chosen; emits
- * "HH:MM" once both are set, and empty as soon as either is cleared back to
- * "--". Uses a custom dropdown internally to bypass the OS-controlled
+ * 24-hour HH/MM dropdown picker. Emits "HH:MM" once both units are set, "" when
+ * both are cleared, and the raw partial ("HH:" or ":MM") when only one unit is
+ * picked — so the form schema can flag a half-filled time instead of silently
+ * dropping it. Uses a custom dropdown internally to bypass the OS-controlled
  * native `<select>` dropdown (which 1) can't be height-limited and 2) on
  * zh-TW Chrome injects an AM/PM column with awkward ordering).
  */
@@ -134,7 +144,9 @@ export function TimeSelect({
 
   const update = (newHH: string, newMM: string) => {
     setLocal({ hh: newHH, mm: newMM });
-    onChange(newHH && newMM ? `${newHH}:${newMM}` : "");
+    // Emit the raw partial ("HH:" or ":MM") when only one unit is picked so the
+    // form schema can flag it as incomplete; a fully-cleared picker emits "".
+    onChange(newHH || newMM ? `${newHH}:${newMM}` : "");
   };
 
   return (

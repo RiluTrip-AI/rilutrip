@@ -30,7 +30,9 @@
     "descriptionMaxLength": "Preferences must be at most 1000 characters",
     "pastDateNotAllowed": "Cannot select past dates",
     "dateTooLong": "Trip duration cannot exceed 14 days",
-    "endTimeAfterStart": "End time must be after start time"
+    "endTimeAfterStart": "End time must be after start time",
+    "timeIncomplete": "Please select both hour and minute",
+    "timeRangeIncomplete": "Please set both start and end time"
   },
   "landing": {
     "hero": {

@@ -238,7 +238,7 @@ describe("TripForm - Form Validation", () => {
 
     await waitFor(() => expect(createItineraryMetadataMock).toHaveBeenCalled());
     const arg = createItineraryMetadataMock.mock.calls[0][0];
-    expect(arg.description).toBe("Please prefer Walking when feasible.");
+    expect(arg.description).toBe("Transport mode: Walking");
   });
 
   function pickTime(groupLabel: string, hh: string, mm: string) {
@@ -268,11 +268,11 @@ describe("TripForm - Form Validation", () => {
 
     await waitFor(() => expect(createItineraryMetadataMock).toHaveBeenCalled());
     const arg = createItineraryMetadataMock.mock.calls[0][0];
-    expect(arg.description).toContain("daily window of 08:00–22:00");
-    expect(arg.description).toContain("Walking");
+    expect(arg.description).toContain("Daily hours: 08:00 - 22:00");
+    expect(arg.description).toContain("Transport mode: Walking");
   });
 
-  it("does not append a hint when only the hour of start time is filled", async () => {
+  it("blocks submit and flags the field when only the hour of start time is picked", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "user-1", is_anonymous: false });
     createItineraryMetadataMock.mockResolvedValue({ id: "itin-1" });
 
@@ -282,15 +282,17 @@ describe("TripForm - Form Validation", () => {
     });
     fireEvent.click(screen.getByTestId("mock-date-picker"));
     fireEvent.click(screen.getByRole("button", { name: /Advanced/i }));
-    // Only set the hour of Start time — minute stays "--" so TimeSelect emits ""
+    // Set only the hour of Start time — minute stays "--", so TimeSelect emits
+    // the half-filled "08:" and the schema must reject it.
     fireEvent.click(screen.getByRole("button", { name: "Start time hour" }));
     fireEvent.click(screen.getByRole("option", { name: "08" }));
 
     fireEvent.click(screen.getByRole("button", { name: /generateButton/i }));
 
-    await waitFor(() => expect(createItineraryMetadataMock).toHaveBeenCalled());
-    const arg = createItineraryMetadataMock.mock.calls[0][0];
-    expect(arg.description).toBeUndefined();
+    await waitFor(() =>
+      expect(screen.getByText("Please select both hour and minute")).toBeInTheDocument(),
+    );
+    expect(createItineraryMetadataMock).not.toHaveBeenCalled();
   });
 
   it("keeps user-typed description before the appended hint when both are present", async () => {

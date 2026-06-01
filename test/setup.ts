@@ -81,6 +81,8 @@ vi.mock("next-intl", () => {
     "validation.endDateAfterStart": "End date must be on or after start date",
     "validation.endTimeAfterStart": "End time must be after start time",
     "validation.timeInvalidFormat": "Time must be in HH:MM format",
+    "validation.timeIncomplete": "Please select both hour and minute",
+    "validation.timeRangeIncomplete": "Please set both start and end time",
     // Error messages
     "landing.form.itineraryLimitError":
       "You have reached your itinerary limit for the current plan.",

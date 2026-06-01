@@ -22,12 +22,12 @@ describe("TimeSelect", () => {
     expect(screen.getByRole("listbox", { name: "Start time hour" })).toBeInTheDocument();
   });
 
-  it("emits empty when only the hour is picked (waiting for minute)", () => {
+  it("emits the half-filled 'HH:' when only the hour is picked so the form can flag it", () => {
     const onChange = vi.fn();
     render(<TimeSelect value="" onChange={onChange} aria-label="Start time" />);
     fireEvent.click(screen.getByRole("button", { name: "Start time hour" }));
     fireEvent.click(screen.getByRole("option", { name: "08" }));
-    expect(onChange).toHaveBeenLastCalledWith("");
+    expect(onChange).toHaveBeenLastCalledWith("08:");
   });
 
   it("emits HH:MM once both are picked", () => {
@@ -40,10 +40,20 @@ describe("TimeSelect", () => {
     expect(onChange).toHaveBeenLastCalledWith("08:30");
   });
 
-  it("emits empty when cleared via the -- option", () => {
+  it("keeps the other unit as a partial when one side is cleared to --", () => {
     const onChange = vi.fn();
     render(<TimeSelect value="08:30" onChange={onChange} aria-label="Start time" />);
     fireEvent.click(screen.getByRole("button", { name: "Start time hour" }));
+    fireEvent.click(screen.getByRole("option", { name: "--" }));
+    expect(onChange).toHaveBeenLastCalledWith(":30");
+  });
+
+  it("emits empty only when both units are cleared to --", () => {
+    const onChange = vi.fn();
+    render(<TimeSelect value="08:30" onChange={onChange} aria-label="Start time" />);
+    fireEvent.click(screen.getByRole("button", { name: "Start time hour" }));
+    fireEvent.click(screen.getByRole("option", { name: "--" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start time minute" }));
     fireEvent.click(screen.getByRole("option", { name: "--" }));
     expect(onChange).toHaveBeenLastCalledWith("");
   });
