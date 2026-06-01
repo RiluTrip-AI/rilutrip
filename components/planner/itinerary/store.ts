@@ -14,11 +14,25 @@ import { aiClient, ApiError } from "@/lib/ai/client";
 import { calcDayCount } from "@/lib/utils/date";
 import { adjustDays } from "@/lib/utils/itinerary";
 import { resolvePlaceDetails, type ResolveStatus } from "@/lib/places/place-resolver";
+import { getAccessToken } from "@/lib/supabase/client";
+import { hasValidCoordinates } from "@/lib/utils/geo";
 
 let pollingIntervalHandle: ReturnType<typeof setInterval> | null = null;
 
 const MAX_HISTORY_ENTRIES = 50;
 type ItineraryErrorKind = "access" | "load" | "runtime" | null;
+
+export type OptimizeDayResult =
+  | { ok: true; unfitCount: number }
+  | {
+      ok: false;
+      reason:
+        | "NOT_ENOUGH_LOCATED"
+        | "MISSING_SETTINGS"
+        | "UNAUTHORIZED"
+        | "INSUFFICIENT_CREDITS"
+        | "ERROR";
+    };
 
 interface ItineraryState {
   // Data State
@@ -35,6 +49,11 @@ interface ItineraryState {
   isSaving: boolean;
   saveError: boolean;
   generationAbortController: AbortController | null;
+
+  // Route Optimization State. A Set (not a single number) so several days can
+  // optimize concurrently without their spinners clobbering each other.
+  optimizingDays: Set<number>;
+  optimizeDay: (dayNumber: number) => Promise<OptimizeDayResult>;
 
   // Interaction State
   previewBaseItinerary: Itinerary | null;
@@ -147,6 +166,7 @@ export const useItineraryStore = create<ItineraryState>((set, get) => ({
   isSaving: false,
   saveError: false,
   generationAbortController: null,
+  optimizingDays: new Set(),
   previewBaseItinerary: null,
   previewItinerary: null,
   crossDayDragInfo: null,
@@ -740,6 +760,86 @@ export const useItineraryStore = create<ItineraryState>((set, get) => ({
       throw err;
     } finally {
       set({ isSaving: false });
+    }
+  },
+
+  optimizeDay: async (dayNumber) => {
+    const state = get();
+    if (!state.itinerary || !get().canEdit()) {
+      return { ok: false, reason: "ERROR" };
+    }
+    const day = state.itinerary.days.find((d) => d.day_number === dayNumber);
+    if (!day) return { ok: false, reason: "ERROR" };
+
+    const located = day.activities.filter((a) => hasValidCoordinates(a.location));
+    if (located.length < 2) {
+      return { ok: false, reason: "NOT_ENOUGH_LOCATED" };
+    }
+
+    // A meaningful optimization needs the day's own time window and transport
+    // mode. These can be absent (the generator drops invalid/missing values
+    // rather than guessing); require them and tell the user to fill them in
+    // instead of optimizing on fabricated defaults.
+    const { transport_mode, start_time, end_time } = day;
+    if (!transport_mode || !start_time || !end_time) {
+      return { ok: false, reason: "MISSING_SETTINGS" };
+    }
+
+    const itineraryId = state.itinerary.id;
+    set((s) => ({ optimizingDays: new Set(s.optimizingDays).add(dayNumber) }));
+    try {
+      const token = await getAccessToken();
+      const res = await fetch("/api/optimize-route", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+        // DB is the source of truth: the server reads the stored itinerary and
+        // writes the optimized order back, so we only name the day to optimize.
+        body: JSON.stringify({ itineraryId, dayNumbers: [dayNumber] }),
+      });
+
+      if (!res.ok) {
+        const reason =
+          res.status === 401
+            ? "UNAUTHORIZED"
+            : res.status === 402
+              ? "INSUFFICIENT_CREDITS"
+              : "ERROR";
+        return { ok: false, reason };
+      }
+
+      const body = (await res.json().catch(() => ({}))) as { unfitCount?: number };
+      // The server wrote the optimized order to the DB. Reload it and push the
+      // current itinerary into history so Undo restores the pre-optimize order
+      // (Undo persists it back to the DB, exactly like undoing any other edit).
+      // Snapshot inside the updater so it captures the state right before we
+      // apply the result — preserving any edit to another day made meanwhile.
+      // We don't re-write here — the server already did. A failed refresh must
+      // not fail the (already-applied) optimization.
+      try {
+        const optimized = await loadItinerary(itineraryId);
+        set((s) => ({
+          itinerary: optimized,
+          historyPast: s.itinerary
+            ? [...s.historyPast, cloneItinerarySnapshot(s.itinerary)].slice(-MAX_HISTORY_ENTRIES)
+            : s.historyPast,
+          historyFuture: [],
+        }));
+      } catch (refreshErr) {
+        console.error("Optimize succeeded but local refresh failed:", refreshErr);
+      }
+      return { ok: true, unfitCount: typeof body.unfitCount === "number" ? body.unfitCount : 0 };
+    } catch (err) {
+      console.error("Failed to optimize day route:", err);
+      return { ok: false, reason: "ERROR" };
+    } finally {
+      set((s) => {
+        const next = new Set(s.optimizingDays);
+        next.delete(dayNumber);
+        return { optimizingDays: next };
+      });
     }
   },
 
