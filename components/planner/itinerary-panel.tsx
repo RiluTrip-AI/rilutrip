@@ -75,6 +75,8 @@ export function ItineraryPanel({
   const setAllDaysTimeWindow = useItineraryStore((state) => state.setAllDaysTimeWindow);
   const setDayTransportMode = useItineraryStore((state) => state.setDayTransportMode);
   const setAllDaysTransportMode = useItineraryStore((state) => state.setAllDaysTransportMode);
+  const optimizeDay = useItineraryStore((state) => state.optimizeDay);
+  const optimizingDays = useItineraryStore((state) => state.optimizingDays);
 
   // Global mouse tracking for add activity mode
   useGlobalAddModeTracking();
@@ -211,6 +213,8 @@ export function ItineraryPanel({
         setAllDaysTimeWindow={canEdit ? setAllDaysTimeWindow : undefined}
         setDayTransportMode={canEdit ? setDayTransportMode : undefined}
         setAllDaysTransportMode={canEdit ? setAllDaysTransportMode : undefined}
+        optimizeDay={canEdit ? optimizeDay : undefined}
+        optimizingDays={optimizingDays}
       />
     ),
     "single-day": () => (
@@ -227,6 +231,8 @@ export function ItineraryPanel({
         setAllDaysTimeWindow={canEdit ? setAllDaysTimeWindow : undefined}
         setDayTransportMode={canEdit ? setDayTransportMode : undefined}
         setAllDaysTransportMode={canEdit ? setAllDaysTransportMode : undefined}
+        optimizeDay={canEdit ? optimizeDay : undefined}
+        optimizingDays={optimizingDays}
       />
     ),
     "side-by-side": () => (
@@ -241,6 +247,8 @@ export function ItineraryPanel({
         setAllDaysTimeWindow={canEdit ? setAllDaysTimeWindow : undefined}
         setDayTransportMode={canEdit ? setDayTransportMode : undefined}
         setAllDaysTransportMode={canEdit ? setAllDaysTransportMode : undefined}
+        optimizeDay={canEdit ? optimizeDay : undefined}
+        optimizingDays={optimizingDays}
       />
     ),
   };

@@ -12,8 +12,10 @@ import { Button } from "@/components/ui/button";
 import { DayActivitiesList } from "../components/day-activities-list";
 import { DayTimePicker } from "../components/day-time-picker";
 import { DayTransportPicker } from "../components/day-transport-picker";
+import { OptimizeDayButton } from "../components/optimize-day-button";
 import { formatDayHeader } from "@/lib/utils/date";
 import { calculateDayDate } from "@/lib/utils/date";
+import { hasValidCoordinates } from "@/lib/utils/geo";
 import type { SingleDayViewProps } from "../types";
 
 export function SingleDayView({
@@ -29,6 +31,8 @@ export function SingleDayView({
   setAllDaysTimeWindow,
   setDayTransportMode,
   setAllDaysTransportMode,
+  optimizeDay,
+  optimizingDays,
 }: SingleDayViewProps) {
   const locale = useLocale();
   const day = itinerary.days[currentDayIndex];
@@ -80,6 +84,14 @@ export function SingleDayView({
               mode={day.transport_mode}
               onSave={setDayTransportMode}
               onApplyAll={setAllDaysTransportMode}
+            />
+            <OptimizeDayButton
+              dayNumber={day.day_number}
+              locatedActivityCount={
+                day.activities.filter((a) => hasValidCoordinates(a.location)).length
+              }
+              isOptimizing={optimizingDays.has(day.day_number)}
+              onOptimize={optimizeDay}
             />
           </div>
         </div>

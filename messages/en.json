@@ -185,6 +185,16 @@
     "activityPlaceholderCard": {
       "clickToAdd": "Click to Add"
     },
+    "optimizeRoute": {
+      "button": "Optimize route",
+      "optimizing": "Optimizing…",
+      "success": "Route optimized",
+      "warningUnfit": "{count} activities couldn't be scheduled and were moved to the end",
+      "warningMissingSettings": "Set this day's time range and transport mode before optimizing",
+      "errorUnauthorized": "Please log in to optimize this route.",
+      "errorInsufficientCredits": "Not enough credits to optimize",
+      "errorGeneric": "Could not optimize the route"
+    },
     "editMetadataDialog": {
       "title": "Edit Trip Details",
       "description": "Modify your trip metadata here. Click save when you're done.",
