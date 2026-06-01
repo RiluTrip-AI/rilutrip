@@ -21,18 +21,18 @@ export interface AdvancedPrefsHintInput {
 }
 
 /**
- * Build a single sentence to append to the AI prompt's customPreferences
- * (= itinerary description). Returns null when the user has expressed
- * nothing — every field empty, or only one of start/end time filled (an
- * incomplete pair carries no useful instruction).
+ * Build the advanced-preferences block appended to the itinerary
+ * description (= the AI prompt's customPreferences). Returns a short
+ * labeled list — one line per preference the user actually set — or null
+ * when the user has expressed nothing (every field empty, or only one of
+ * start/end time filled, which is an incomplete pair carrying no useful
+ * instruction).
  *
- * Supports partial input: time range alone, transport mode alone, or both.
- * Whatever the user actually filled goes into the sentence; whatever they
- * skipped is silently omitted.
+ * Supports partial input: transport mode alone, time range alone, or both.
+ * Whatever the user skipped is silently omitted.
  *
- * The output is a clear instruction so the AI is unlikely to ignore it,
- * while still being a hint — sanitizeDayMeta in the edge function remains
- * the source of truth for what actually lands in the day-level metadata.
+ * It stays a hint — sanitizeDayMeta in the edge function remains the source
+ * of truth for what actually lands in the day-level metadata.
  */
 export function buildAdvancedPrefsHint(input: AdvancedPrefsHintInput): string | null {
   // Treat empty string and undefined identically as "unset". Using truthy
@@ -48,21 +48,16 @@ export function buildAdvancedPrefsHint(input: AdvancedPrefsHintInput): string | 
 
   const isZh = input.locale === "zh-TW";
 
-  if (isZh) {
-    const timePart = hasTimeRange ? `每日 ${start}–${end}` : "";
-    const transportPart = hasTransport ? `交通方式個人偏好為${input.transportModeLabel}` : "";
-    const body = [timePart, transportPart].filter(Boolean).join("、");
-    return `請以${body}安排行程。`;
-  }
+  const transportLine = hasTransport
+    ? isZh
+      ? `交通方式：${input.transportModeLabel}`
+      : `Transport mode: ${input.transportModeLabel}`
+    : "";
+  const timeLine = hasTimeRange
+    ? isZh
+      ? `每日旅遊時間：${start} - ${end}`
+      : `Daily hours: ${start} - ${end}`
+    : "";
 
-  const timePart = hasTimeRange ? `a daily window of ${start}–${end}` : "";
-  const transportPart = hasTransport ? `prefer ${input.transportModeLabel} when feasible` : "";
-
-  if (hasTimeRange && hasTransport) {
-    return `Please plan with ${timePart} and ${transportPart}.`;
-  }
-  if (hasTimeRange) {
-    return `Please plan with ${timePart}.`;
-  }
-  return `Please ${transportPart}.`;
+  return [transportLine, timeLine].filter(Boolean).join("\n");
 }
