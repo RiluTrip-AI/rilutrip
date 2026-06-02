@@ -26,11 +26,7 @@ export const createTripFormSchema = (t: TranslationFunction) =>
         to: z.date().optional(),
       }),
       description: z.string().max(1000, t("validation.descriptionMaxLength")).optional(),
-      // Advanced-prefs fields. Empty string (or absent) means "not set" so
-      // the UI can show placeholders instead of preselected defaults; format
-      // and cross-field checks live in superRefine and skip blank values.
-      // `.optional()` lets callers omit these (test fixtures, future inputs)
-      // without tripping schema-level "required" errors.
+      // Advanced-prefs fields.
       startTime: z.string().optional(),
       endTime: z.string().optional(),
       transportMode: z.union([z.literal(""), TransportModeSchema]).optional(),
@@ -87,11 +83,7 @@ export const createTripFormSchema = (t: TranslationFunction) =>
         });
       }
 
-      // Advanced-prefs time validation. Each side is empty (silent), partial
-      // (one of HH/MM picked — the picker emits "HH:" or ":MM"), or complete.
-      // A partial side must be finished; one complete side with the other left
-      // empty is a half-specified range; start < end runs only when both are
-      // complete.
+      // The picker emits "HH:" or ":MM" for a half-filled side ("partial").
       const classifyTime = (v?: string): "empty" | "partial" | "complete" =>
         !v ? "empty" : TIME_PATTERN.test(v) ? "complete" : "partial";
       const startState = classifyTime(data.startTime);
