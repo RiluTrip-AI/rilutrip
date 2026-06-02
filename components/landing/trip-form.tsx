@@ -77,7 +77,6 @@ export function TripForm() {
       const hint = buildAdvancedPrefsHint({
         startTime: data.startTime,
         endTime: data.endTime,
-        transportMode: data.transportMode,
         locale,
         transportModeLabel: data.transportMode ? tp(`transportMode.${data.transportMode}`) : "",
       });

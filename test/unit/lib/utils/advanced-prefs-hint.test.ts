@@ -5,7 +5,6 @@ describe("buildAdvancedPrefsHint", () => {
   const empty = {
     startTime: "",
     endTime: "",
-    transportMode: "" as const,
     locale: "en",
     transportModeLabel: "",
   };
@@ -41,7 +40,6 @@ describe("buildAdvancedPrefsHint", () => {
   it("emits a transport-only line when only transport mode is filled (en)", () => {
     const hint = buildAdvancedPrefsHint({
       ...empty,
-      transportMode: "walking",
       transportModeLabel: "Walking",
     });
     expect(hint).toBe("Transport mode: Walking");
@@ -51,7 +49,6 @@ describe("buildAdvancedPrefsHint", () => {
     const hint = buildAdvancedPrefsHint({
       ...empty,
       locale: "zh-TW",
-      transportMode: "walking",
       transportModeLabel: "步行",
     });
     expect(hint).toBe("交通方式：步行");
@@ -61,7 +58,6 @@ describe("buildAdvancedPrefsHint", () => {
     const hint = buildAdvancedPrefsHint({
       startTime: "08:00",
       endTime: "22:00",
-      transportMode: "walking",
       transportModeLabel: "Walking",
       locale: "en",
     });
@@ -72,7 +68,6 @@ describe("buildAdvancedPrefsHint", () => {
     const hint = buildAdvancedPrefsHint({
       startTime: "08:00",
       endTime: "22:00",
-      transportMode: "walking",
       transportModeLabel: "步行",
       locale: "zh-TW",
     });
@@ -83,7 +78,6 @@ describe("buildAdvancedPrefsHint", () => {
     const hint = buildAdvancedPrefsHint({
       ...empty,
       locale: "ja",
-      transportMode: "driving",
       transportModeLabel: "Driving",
     });
     expect(hint).toBe("Transport mode: Driving");

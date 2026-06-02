@@ -1,5 +1,3 @@
-import type { TransportMode } from "@/types/itinerary";
-
 /**
  * Inputs to the hint builder.
  *
@@ -12,8 +10,6 @@ export interface AdvancedPrefsHintInput {
   startTime?: string;
   /** Empty/undefined means unset; otherwise HH:MM. */
   endTime?: string;
-  /** Empty/undefined means unset; otherwise a TransportMode value. */
-  transportMode?: TransportMode | "";
   /** Active app locale (e.g. "en" | "zh-TW"). Anything else falls back to en. */
   locale: string;
   /** Localized display name for transportMode (e.g. "Walking" / "步行"). */
@@ -39,10 +35,10 @@ export function buildAdvancedPrefsHint(input: AdvancedPrefsHintInput): string | 
   // checks keeps the rest of the code branch-free.
   const start = input.startTime || "";
   const end = input.endTime || "";
-  const mode = input.transportMode || "";
+  const transport = input.transportModeLabel || "";
 
   const hasTimeRange = start !== "" && end !== "";
-  const hasTransport = mode !== "";
+  const hasTransport = transport !== "";
 
   if (!hasTimeRange && !hasTransport) return null;
 
@@ -50,8 +46,8 @@ export function buildAdvancedPrefsHint(input: AdvancedPrefsHintInput): string | 
 
   const transportLine = hasTransport
     ? isZh
-      ? `交通方式：${input.transportModeLabel}`
-      : `Transport mode: ${input.transportModeLabel}`
+      ? `交通方式：${transport}`
+      : `Transport mode: ${transport}`
     : "";
   const timeLine = hasTimeRange
     ? isZh
