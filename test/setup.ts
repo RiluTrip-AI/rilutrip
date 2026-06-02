@@ -119,6 +119,8 @@ vi.mock("next-intl", () => {
     "landing.form.endTimeLabel": "End time",
     "landing.form.transportMode": "Transport mode",
     "landing.form.optional": "(optional)",
+    "landing.form.advancedPrefsHint.transport": "Transport mode: {mode}",
+    "landing.form.advancedPrefsHint.time": "Daily hours: {start} - {end}",
   };
 
   return {

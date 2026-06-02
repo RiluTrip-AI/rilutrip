@@ -57,7 +57,11 @@
       "transportMode": "Transport mode",
       "optional": "(optional)",
       "perfectArrangeButton": "Perfect Arrangement",
-      "autoOptimizing": "Optimizing routes..."
+      "autoOptimizing": "Optimizing routes...",
+      "advancedPrefsHint": {
+        "transport": "Transport mode: {mode}",
+        "time": "Daily hours: {start} - {end}"
+      }
     },
     "trending": {
       "title": "Trending Destinations",

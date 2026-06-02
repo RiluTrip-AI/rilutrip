@@ -57,7 +57,11 @@
       "transportMode": "交通方式",
       "optional": "（選填）",
       "perfectArrangeButton": "完美安排",
-      "autoOptimizing": "路線優化中..."
+      "autoOptimizing": "路線優化中...",
+      "advancedPrefsHint": {
+        "transport": "交通方式：{mode}",
+        "time": "每日旅遊時間：{start} - {end}"
+      }
     },
     "trending": {
       "title": "熱門目的地",

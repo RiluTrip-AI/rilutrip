@@ -1,59 +1,34 @@
 /**
- * Inputs to the hint builder.
- *
- * Each field uses empty string to mean "user has not set this" — that lets
- * the form start with placeholder-looking inputs (no preselected defaults
- * surfaced as preferences) while keeping the field types simple strings.
+ * Inputs to the hint builder. Time values use empty string / undefined to
+ * mean "unset"; the localized `lines` are resolved by the caller so this util
+ * stays free of i18n wiring.
  */
 export interface AdvancedPrefsHintInput {
-  /** Empty/undefined means unset; otherwise HH:MM. */
   startTime?: string;
-  /** Empty/undefined means unset; otherwise HH:MM. */
   endTime?: string;
-  /** Active app locale (e.g. "en" | "zh-TW"). Anything else falls back to en. */
-  locale: string;
-  /** Localized display name for transportMode (e.g. "Walking" / "步行"). */
-  transportModeLabel: string;
+  lines: {
+    /** Full transport line, e.g. "Transport mode: Walking". Empty = no mode picked. */
+    transport: string;
+    /** Full daily-hours line, e.g. "Daily hours: 08:00 - 22:00". */
+    time: string;
+  };
 }
 
 /**
- * Build the advanced-preferences block appended to the itinerary
- * description (= the AI prompt's customPreferences). Returns a short
- * labeled list — one line per preference the user actually set — or null
- * when the user has expressed nothing (every field empty, or only one of
- * start/end time filled, which is an incomplete pair carrying no useful
- * instruction).
- *
- * Supports partial input: transport mode alone, time range alone, or both.
- * Whatever the user skipped is silently omitted.
- *
- * It stays a hint — sanitizeDayMeta in the edge function remains the source
- * of truth for what actually lands in the day-level metadata.
+ * Build the advanced-preferences block appended to the itinerary description
+ * (= the AI prompt's customPreferences): one line per preference the user set,
+ * or null when nothing useful was expressed. Transport is listed above time.
  */
 export function buildAdvancedPrefsHint(input: AdvancedPrefsHintInput): string | null {
-  // Treat empty string and undefined identically as "unset". Using truthy
-  // checks keeps the rest of the code branch-free.
   const start = input.startTime || "";
   const end = input.endTime || "";
-  const transport = input.transportModeLabel || "";
 
   const hasTimeRange = start !== "" && end !== "";
-  const hasTransport = transport !== "";
+  const hasTransport = input.lines.transport !== "";
 
   if (!hasTimeRange && !hasTransport) return null;
 
-  const isZh = input.locale === "zh-TW";
-
-  const transportLine = hasTransport
-    ? isZh
-      ? `交通方式：${transport}`
-      : `Transport mode: ${transport}`
-    : "";
-  const timeLine = hasTimeRange
-    ? isZh
-      ? `每日旅遊時間：${start} - ${end}`
-      : `Daily hours: ${start} - ${end}`
-    : "";
-
-  return [transportLine, timeLine].filter(Boolean).join("\n");
+  return [hasTransport ? input.lines.transport : "", hasTimeRange ? input.lines.time : ""]
+    .filter(Boolean)
+    .join("\n");
 }

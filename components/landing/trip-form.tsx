@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "@/lib/i18n/navigation";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -28,7 +28,6 @@ export function TripForm() {
   const tv = useTranslations();
   const ti = useTranslations("itineraries");
   const tp = useTranslations("planner");
-  const locale = useLocale();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
@@ -77,8 +76,15 @@ export function TripForm() {
       const hint = buildAdvancedPrefsHint({
         startTime: data.startTime,
         endTime: data.endTime,
-        locale,
-        transportModeLabel: data.transportMode ? tp(`transportMode.${data.transportMode}`) : "",
+        lines: {
+          transport: data.transportMode
+            ? t("advancedPrefsHint.transport", { mode: tp(`transportMode.${data.transportMode}`) })
+            : "",
+          time: t("advancedPrefsHint.time", {
+            start: data.startTime ?? "",
+            end: data.endTime ?? "",
+          }),
+        },
       });
       const baseDescription = data.description?.trim() ?? "";
       const finalDescription = [baseDescription, hint].filter(Boolean).join("\n\n") || undefined;
