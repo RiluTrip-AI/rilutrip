@@ -193,7 +193,7 @@
       "warningMissingSettings": "請先設定這天的時間範圍與交通方式，再優化路線",
       "errorUnauthorized": "請先登入，才能優化路線。",
       "errorInsufficientCredits": "點數不足，無法優化",
-      "errorGeneric": "無法優化路線"
+      "errorGeneric": "無法優化路線，請稍後再試"
     },
     "editMetadataDialog": {
       "title": "編輯行程資訊",

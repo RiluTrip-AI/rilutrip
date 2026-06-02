@@ -104,7 +104,7 @@ vi.mock("next-intl", () => {
       "Set this day's time range and transport mode before optimizing",
     "planner.optimizeRoute.errorUnauthorized": "Please log in to optimize this route.",
     "planner.optimizeRoute.errorInsufficientCredits": "Not enough credits to optimize",
-    "planner.optimizeRoute.errorGeneric": "Could not optimize the route",
+    "planner.optimizeRoute.errorGeneric": "Couldn't optimize the route. Please try again later.",
     // Day time display
     "planner.dayTimeDisplay.title": "Day {dayNumber} Time Range",
     "planner.dayTimeDisplay.noTime": "Set hours",
