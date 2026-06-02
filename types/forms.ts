@@ -1,10 +1,13 @@
 import { z } from "zod";
+import { TransportModeSchema } from "./itinerary";
 
 // ============================================================================
 // Schema Factory Types
 // ============================================================================
 
 export type TranslationFunction = (key: string) => string;
+
+const TIME_PATTERN = /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/;
 
 // ============================================================================
 // Landing Page Data Forms
@@ -23,6 +26,10 @@ export const createTripFormSchema = (t: TranslationFunction) =>
         to: z.date().optional(),
       }),
       description: z.string().max(1000, t("validation.descriptionMaxLength")).optional(),
+      // Advanced-prefs fields.
+      startTime: z.string().optional(),
+      endTime: z.string().optional(),
+      transportMode: z.union([z.literal(""), TransportModeSchema]).optional(),
     })
     .superRefine((data, ctx) => {
       const { from, to } = data.dates;
@@ -73,6 +80,52 @@ export const createTripFormSchema = (t: TranslationFunction) =>
           code: "custom",
           message: t("validation.dateTooLong"),
           path: ["dates"],
+        });
+      }
+
+      // The picker emits "HH:" or ":MM" for a half-filled side ("partial").
+      const classifyTime = (v?: string): "empty" | "partial" | "complete" =>
+        !v ? "empty" : TIME_PATTERN.test(v) ? "complete" : "partial";
+      const startState = classifyTime(data.startTime);
+      const endState = classifyTime(data.endTime);
+
+      if (startState === "partial") {
+        ctx.addIssue({
+          code: "custom",
+          message: t("validation.timeIncomplete"),
+          path: ["startTime"],
+        });
+      }
+      if (endState === "partial") {
+        ctx.addIssue({
+          code: "custom",
+          message: t("validation.timeIncomplete"),
+          path: ["endTime"],
+        });
+      }
+      if (startState === "complete" && endState === "empty") {
+        ctx.addIssue({
+          code: "custom",
+          message: t("validation.timeRangeIncomplete"),
+          path: ["endTime"],
+        });
+      }
+      if (endState === "complete" && startState === "empty") {
+        ctx.addIssue({
+          code: "custom",
+          message: t("validation.timeRangeIncomplete"),
+          path: ["startTime"],
+        });
+      }
+      if (
+        startState === "complete" &&
+        endState === "complete" &&
+        data.startTime! >= data.endTime!
+      ) {
+        ctx.addIssue({
+          code: "custom",
+          message: t("validation.endTimeAfterStart"),
+          path: ["endTime"],
         });
       }
     });
