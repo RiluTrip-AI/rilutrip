@@ -27,25 +27,30 @@ export function OptimizeDayButton({
   const handleClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (disabled || !onOptimize) return;
-    try {
-      const result = await onOptimize(dayNumber);
-      if (result.ok) {
-        if (result.unfitCount > 0) {
-          toast.warning(t("warningUnfit", { count: result.unfitCount }));
-        } else {
-          toast.success(t("success"));
-        }
-      } else if (result.reason === "MISSING_SETTINGS") {
-        toast.warning(t("warningMissingSettings"));
-      } else if (result.reason === "UNAUTHORIZED") {
-        toast.error(t("errorUnauthorized"));
-      } else if (result.reason === "INSUFFICIENT_CREDITS") {
-        toast.error(t("errorInsufficientCredits"));
-      } else if (result.reason === "ERROR") {
-        toast.error(t("errorGeneric"));
+    const result = await onOptimize(dayNumber);
+    if (result.ok) {
+      if (result.unfitCount > 0) {
+        toast.warning(t("warningUnfit", { count: result.unfitCount }));
+      } else {
+        toast.success(t("success"));
       }
-    } finally {
-      // Credits are captured server-side; refresh the displayed balance.
+    } else if (result.reason === "MISSING_SETTINGS") {
+      toast.warning(t("warningMissingSettings"));
+    } else if (result.reason === "NOT_ENOUGH_LOCATED") {
+      toast.warning(t("warningNotEnoughLocated"));
+    } else if (result.reason === "UNAUTHORIZED") {
+      toast.error(t("errorUnauthorized"));
+    } else if (result.reason === "INSUFFICIENT_CREDITS") {
+      toast.error(t("errorInsufficientCredits"));
+    } else if (result.reason === "ERROR") {
+      toast.error(t("errorGeneric"));
+    }
+
+    // Credits are captured server-side. Skip the balance refetch for the local
+    // pre-checks that never reach the server (nothing could have been charged).
+    const reachedServer =
+      result.ok || (result.reason !== "MISSING_SETTINGS" && result.reason !== "NOT_ENOUGH_LOCATED");
+    if (reachedServer) {
       refreshProfile().catch((err) => {
         console.error("Failed to refresh profile:", err);
       });

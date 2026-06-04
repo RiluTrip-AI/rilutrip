@@ -191,6 +191,7 @@
       "success": "Route optimized",
       "warningUnfit": "{count} activities couldn't be scheduled and were moved to the end",
       "warningMissingSettings": "Set this day's time range and transport mode before optimizing",
+      "warningNotEnoughLocated": "Add at least 2 activities with a location before optimizing",
       "errorUnauthorized": "Please log in to optimize this route.",
       "errorInsufficientCredits": "Not enough credits to optimize",
       "errorGeneric": "Couldn't optimize the route. Please try again later."
