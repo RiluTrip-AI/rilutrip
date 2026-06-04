@@ -810,25 +810,42 @@ export const useItineraryStore = create<ItineraryState>((set, get) => ({
         return { ok: false, reason };
       }
 
-      const body = (await res.json().catch(() => ({}))) as { unfitCount?: number };
-      // The server wrote the optimized order to the DB. Reload it and push the
-      // current itinerary into history so Undo restores the pre-optimize order
-      // (Undo persists it back to the DB, exactly like undoing any other edit).
-      // Snapshot inside the updater so it captures the state right before we
-      // apply the result — preserving any edit to another day made meanwhile.
-      // We don't re-write here — the server already did. A failed refresh must
-      // not fail the (already-applied) optimization.
-      try {
-        const optimized = await loadItinerary(itineraryId);
-        set((s) => ({
-          itinerary: optimized,
-          historyPast: s.itinerary
-            ? [...s.historyPast, cloneItinerarySnapshot(s.itinerary)].slice(-MAX_HISTORY_ENTRIES)
-            : s.historyPast,
-          historyFuture: [],
-        }));
-      } catch (refreshErr) {
-        console.error("Optimize succeeded but local refresh failed:", refreshErr);
+      // The server only computes — it returns the optimized order and leaves the
+      // DB untouched. Apply it onto the LATEST local itinerary (so a concurrent
+      // edit to another day survives) and persist through commitItineraryChange,
+      // which writes the DB, pushes history for Undo, and broadcasts to Yjs —
+      // exactly the path every other edit takes.
+      const body = (await res.json().catch(() => ({}))) as {
+        unfitCount?: number;
+        days?: Array<{
+          dayNumber: number;
+          activities: Array<{ id: string; time: string; order: number }>;
+        }>;
+      };
+      const optimized = body.days?.find((d) => d.dayNumber === dayNumber);
+      const current = get().itinerary;
+      if (optimized && current) {
+        const orderById = new Map(optimized.activities.map((a) => [a.id, a.order]));
+        const timeById = new Map(optimized.activities.map((a) => [a.id, a.time]));
+        // Activities the server didn't return (rare divergence) keep their place
+        // after the optimized ones.
+        const fallbackBase = optimized.activities.length;
+        const nextItinerary: Itinerary = {
+          ...current,
+          days: current.days.map((d) => {
+            if (d.day_number !== dayNumber) return d;
+            let extra = 0;
+            const activities = d.activities
+              .map((a) => ({
+                ...a,
+                time: timeById.get(a.id) ?? a.time,
+                order: orderById.get(a.id) ?? fallbackBase + extra++,
+              }))
+              .sort((x, y) => x.order - y.order);
+            return { ...d, activities };
+          }),
+        };
+        await get().commitItineraryChange(nextItinerary);
       }
       return { ok: true, unfitCount: typeof body.unfitCount === "number" ? body.unfitCount : 0 };
     } catch (err) {

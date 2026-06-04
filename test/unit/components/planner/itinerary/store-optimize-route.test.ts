@@ -80,17 +80,36 @@ function setup(itinerary = baseItinerary()) {
   });
 }
 
-function okResponse() {
-  return new Response(JSON.stringify({ ok: true, creditCaptured: true }), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
+// The server returns the optimized order (it does not write the DB). This puts
+// day 1 in b-then-a order so tests can assert the client applied it.
+function okResponse(unfitCount?: number) {
+  return new Response(
+    JSON.stringify({
+      ok: true,
+      days: [
+        {
+          dayNumber: 1,
+          activities: [
+            { id: "b", time: "09:00", order: 0 },
+            { id: "a", time: "10:00", order: 1 },
+          ],
+          warnings: [],
+        },
+      ],
+      ...(unfitCount !== undefined ? { unfitCount } : {}),
+    }),
+    { status: 200, headers: { "Content-Type": "application/json" } },
+  );
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
-  // optimizeDay reloads the server-written itinerary via loadItinerary on success.
-  mocks.loadItinerary.mockResolvedValue(baseItinerary());
+  // The client now persists the optimized order through commitItineraryChange →
+  // updateItinerary; echo the written payload back as the saved itinerary.
+  mocks.updateItinerary.mockImplementation(async (_id: string, payload: Partial<Itinerary>) => ({
+    ...baseItinerary(),
+    ...payload,
+  }));
   setup();
 });
 
@@ -99,7 +118,7 @@ afterEach(() => {
 });
 
 describe("optimizeDay", () => {
-  it("sends a minimal day-numbers payload, reloads from DB, and records undo history without writing", async () => {
+  it("sends a minimal day-numbers payload, applies the returned order via the write path, and records undo history", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(okResponse());
 
     const result = await useItineraryStore.getState().optimizeDay(1);
@@ -107,20 +126,18 @@ describe("optimizeDay", () => {
     expect(result).toEqual({ ok: true, unfitCount: 0 });
     const requestBody = JSON.parse((fetchSpy.mock.calls[0][1] as RequestInit).body as string);
     expect(requestBody).toEqual({ itineraryId: ITINERARY_ID, dayNumbers: [1] });
-    // Server owns the DB write; the client reloads the result and records the
-    // pre-optimize snapshot for Undo, but never writes itself.
-    expect(mocks.loadItinerary).toHaveBeenCalledWith(ITINERARY_ID);
-    expect(mocks.updateItinerary).not.toHaveBeenCalled();
+    // The server only computes; the client applies the returned order through the
+    // normal commitItineraryChange path (writes the DB + records Undo) and never
+    // reloads from the server.
+    expect(mocks.loadItinerary).not.toHaveBeenCalled();
+    expect(mocks.updateItinerary).toHaveBeenCalledTimes(1);
     expect(useItineraryStore.getState().historyPast).toHaveLength(1);
+    const order = useItineraryStore.getState().itinerary!.days[0].activities.map((a) => a.id);
+    expect(order).toEqual(["b", "a"]);
   });
 
   it("surfaces the server's unfit-activity count on success", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response(JSON.stringify({ ok: true, creditCaptured: true, unfitCount: 2 }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }),
-    );
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(okResponse(2));
 
     const result = await useItineraryStore.getState().optimizeDay(1);
 
@@ -197,7 +214,7 @@ describe("optimizeDay", () => {
 
     const after = useItineraryStore.getState().itinerary!.days[0].activities.map((a) => a.id);
     expect(after).toEqual(before);
-    expect(mocks.loadItinerary).not.toHaveBeenCalled();
+    expect(mocks.updateItinerary).not.toHaveBeenCalled();
     expect(result).toEqual({ ok: false, reason: "INSUFFICIENT_CREDITS" });
   });
 
@@ -211,7 +228,7 @@ describe("optimizeDay", () => {
 
     const result = await useItineraryStore.getState().optimizeDay(1);
 
-    expect(mocks.loadItinerary).not.toHaveBeenCalled();
+    expect(mocks.updateItinerary).not.toHaveBeenCalled();
     expect(result).toEqual({ ok: false, reason: "UNAUTHORIZED" });
   });
 });
