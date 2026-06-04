@@ -32,10 +32,6 @@ const TimeHHMMSchema = z.string().regex(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/);
 const UuidSchema = z.uuid();
 const TransportModeSchema = z.enum(["walking", "bicycling", "driving", "transit"]);
 const RESOLVE_BATCH_SIZE = 10;
-// Optimistic write retries. Each retry re-reads the latest itinerary and
-// re-applies the precomputed order; the read+write window is tiny, so a
-// concurrent edit almost never beats us more than once.
-const MAX_WRITE_RETRIES = 5;
 // Cap concurrent per-day optimize calls. Each day already runs chunked Google
 // Routes Matrix requests internally, so 3 keeps the total Google fan-out
 // bounded while still parallelising across days.
@@ -49,16 +45,11 @@ const ROUTE_OPTIMIZE_BATCH_SIZE = 3;
 const OptimizeRequestSchema = z.object({
   itineraryId: UuidSchema,
   dayNumbers: z.array(z.number().int().positive()).length(1),
-  skipCreditCapture: z.boolean().optional(),
-  skipCreditCaptureToken: z.string().uuid().optional(),
 });
 
-type OptimizeRequest = z.infer<typeof OptimizeRequestSchema>;
-
 // Shape we read out of `itineraries.data` (JSONB). Parsed with Zod (not cast)
-// so a malformed row can't crash optimization. Unknown fields are preserved
-// only for reading inputs — the write-back path mutates the raw JSON directly
-// so nothing is dropped.
+// so a malformed row can't crash optimization. Unknown fields are ignored — we
+// only read optimizer inputs here; the client applies the returned order.
 const StoredActivitySchema = z
   .object({
     id: z.string(),
@@ -92,34 +83,6 @@ const StoredItineraryDataSchema = z.object({
 });
 
 type StoredDay = z.infer<typeof StoredDaySchema>;
-
-function hasValidGatewaySecret(req: Request): boolean {
-  const gatewaySecret = Deno.env.get("API_GATEWAY_SECRET");
-  return Boolean(gatewaySecret && req.headers.get("x-gateway-secret") === gatewaySecret);
-}
-
-async function hasValidInternalOptimizationToken(
-  supabaseAdmin: SupabaseClient,
-  request: OptimizeRequest,
-): Promise<boolean> {
-  if (!request.skipCreditCaptureToken) return false;
-
-  const { data, error } = await supabaseAdmin
-    .from("itineraries")
-    .select("data")
-    .eq("id", request.itineraryId)
-    .single();
-
-  if (error || !data || typeof data.data !== "object" || data.data === null) return false;
-
-  const itineraryData = data.data as { internal_optimization_token_hash?: unknown };
-  if (typeof itineraryData.internal_optimization_token_hash !== "string") return false;
-
-  return (
-    itineraryData.internal_optimization_token_hash ===
-    (await sha256Hex(request.skipCreditCaptureToken))
-  );
-}
 
 function jsonResponse(body: object, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -240,13 +203,6 @@ async function optimizeDay(day: OptimizeDayInput): Promise<OptimizedDay> {
   };
 }
 
-async function sha256Hex(payload: string): Promise<string> {
-  const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(payload));
-  return Array.from(new Uint8Array(hash))
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-}
-
 function isMatrixSource(value: unknown): value is MatrixSource {
   return value === "google_routes_matrix" || value === "haversine_fallback";
 }
@@ -365,14 +321,12 @@ async function loadItineraryForOptimize(
   supabaseAdmin: SupabaseClient,
   itineraryId: string,
 ): Promise<{
-  data: Record<string, unknown>;
   startDate: string;
-  updatedAt: string;
   days: StoredDay[];
 } | null> {
   const { data, error } = await supabaseAdmin
     .from("itineraries")
-    .select("data, start_date, updated_at")
+    .select("data, start_date")
     .eq("id", itineraryId)
     .single();
   if (error || !data) return null;
@@ -380,9 +334,7 @@ async function loadItineraryForOptimize(
   const rawData = isRecord(data.data) ? (data.data as Record<string, unknown>) : {};
   const parsedData = StoredItineraryDataSchema.safeParse(rawData);
   return {
-    data: rawData,
     startDate: typeof data.start_date === "string" ? data.start_date : "",
-    updatedAt: typeof data.updated_at === "string" ? data.updated_at : "",
     days: parsedData.success ? (parsedData.data.days ?? []) : [],
   };
 }
@@ -676,71 +628,20 @@ async function saveReturnedMatrices(
 // other snapshot fields. Operates on RAW JSON so note/url/coordinates survive.
 // Concurrent edits to this day during optimization are intentionally discarded
 // by writing this snapshot-derived day wholesale.
-function buildOptimizedDays(
-  snapshotData: Record<string, unknown>,
-  resultByDay: Map<number, OptimizedDay>,
-): Map<number, Record<string, unknown>> {
-  const optimizedByDay = new Map<number, Record<string, unknown>>();
-  const rawDays = Array.isArray(snapshotData.days) ? snapshotData.days : [];
-  for (const rawDay of rawDays) {
-    if (!isRecord(rawDay) || typeof rawDay.day_number !== "number") continue;
-    const result = resultByDay.get(rawDay.day_number);
-    if (!result) continue;
-    const orderById = new Map(result.activities.map((activity) => [activity.id, activity]));
-    const rawActivities = Array.isArray(rawDay.activities) ? rawDay.activities : [];
-    const activities = rawActivities
-      .map((rawActivity) => {
-        if (!isRecord(rawActivity) || typeof rawActivity.id !== "string") return rawActivity;
-        const optimized = orderById.get(rawActivity.id);
-        return optimized
-          ? { ...rawActivity, time: optimized.time, order: optimized.order }
-          : rawActivity;
-      })
-      .sort((a, b) => {
-        const aOrder = isRecord(a) && typeof a.order === "number" ? a.order : 0;
-        const bOrder = isRecord(b) && typeof b.order === "number" ? b.order : 0;
-        return aOrder - bOrder;
-      });
-    optimizedByDay.set(rawDay.day_number, { ...rawDay, activities });
-  }
-  return optimizedByDay;
-}
-
-// Persist the result with an optimistic retry loop. Design: the optimized day is
-// OWNED by the optimization — we overwrite it wholesale from the T0 snapshot, so
-// any edit made to THAT day while Google/Vroom ran is intentionally discarded.
-// Every OTHER day is taken from a fresh re-read each attempt, so concurrent edits
-// to other days are preserved; the updated_at guard + retry keeps those safe
-// (the retry window is just read+write, no API calls, so it almost never repeats).
-async function writeOptimizedOrder(
-  supabaseAdmin: SupabaseClient,
-  input: { itineraryId: string; snapshotData: Record<string, unknown>; results: OptimizedDay[] },
-): Promise<boolean> {
-  const resultByDay = new Map(input.results.map((result) => [result.dayNumber, result]));
-  const optimizedByDay = buildOptimizedDays(input.snapshotData, resultByDay);
-
-  for (let attempt = 0; attempt < MAX_WRITE_RETRIES; attempt++) {
-    const current = await loadItineraryForOptimize(supabaseAdmin, input.itineraryId);
-    if (!current) return false;
-
-    const freshRawDays = Array.isArray(current.data.days) ? current.data.days : [];
-    const newDays = freshRawDays.map((rawDay) => {
-      if (!isRecord(rawDay) || typeof rawDay.day_number !== "number") return rawDay;
-      // Optimized day → overwrite wholesale from snapshot; other days → keep fresh.
-      return optimizedByDay.get(rawDay.day_number) ?? rawDay;
-    });
-
-    const { data, error } = await supabaseAdmin
-      .from("itineraries")
-      .update({ data: { ...current.data, days: newDays } })
-      .eq("id", input.itineraryId)
-      .eq("updated_at", current.updatedAt)
-      .select("id");
-    if (error) throw new Error(`Failed to write optimized order: ${error.message}`);
-    if ((data?.length ?? 0) > 0) return true;
-    // Optimistic-lock miss: re-read the latest (for other days) and re-apply.
-  }
-  return false;
+// The optimized order is returned to the client, which applies it through the
+// normal commitItineraryChange path (DB write + Yjs broadcast + undo). The server
+// stays read-only on the itinerary, so the optimize result syncs to collaborators
+// in real time exactly like any other edit and inherits the app's LWW semantics.
+function buildClientDays(results: OptimizedDay[]): Array<{
+  dayNumber: number;
+  activities: OptimizedDay["activities"];
+  warnings: OptimizedDay["warnings"];
+}> {
+  return results.map((result) => ({
+    dayNumber: result.dayNumber,
+    activities: result.activities,
+    warnings: result.warnings,
+  }));
 }
 
 Deno.serve(async (req) => {
@@ -792,28 +693,22 @@ Deno.serve(async (req) => {
     );
   }
 
-  const skipCreditCapture =
-    parsed.data.skipCreditCapture === true &&
-    (hasValidGatewaySecret(req) ||
-      (await hasValidInternalOptimizationToken(supabaseAdmin, parsed.data)));
-  if (!skipCreditCapture) {
-    const capture = await captureCredits(supabaseAdmin, user.userId, "OPTIMIZE_ROUTE");
-    if (!capture.success) {
-      if (capture.error) {
-        console.error(
-          JSON.stringify({
-            action: "OPTIMIZE_ROUTE",
-            error: capture.error,
-            event: "credit_event",
-            operation_id: operationId,
-            phase: "capture_failed",
-            user_id: user.userId,
-          }),
-        );
-        return jsonResponse({ error: "Credit system error", code: "CREDIT_SYSTEM_ERROR" }, 500);
-      }
-      return jsonResponse({ error: "Insufficient credits", code: "INSUFFICIENT_CREDITS" }, 402);
+  const capture = await captureCredits(supabaseAdmin, user.userId, "OPTIMIZE_ROUTE");
+  if (!capture.success) {
+    if (capture.error) {
+      console.error(
+        JSON.stringify({
+          action: "OPTIMIZE_ROUTE",
+          error: capture.error,
+          event: "credit_event",
+          operation_id: operationId,
+          phase: "capture_failed",
+          user_id: user.userId,
+        }),
+      );
+      return jsonResponse({ error: "Credit system error", code: "CREDIT_SYSTEM_ERROR" }, 500);
     }
+    return jsonResponse({ error: "Insufficient credits", code: "INSUFFICIENT_CREDITS" }, 402);
   }
 
   try {
@@ -828,27 +723,10 @@ Deno.serve(async (req) => {
       results,
     });
 
-    const written = await writeOptimizedOrder(supabaseAdmin, {
-      itineraryId: parsed.data.itineraryId,
-      snapshotData: itinerary.data,
-      results,
-    });
-    if (!written) {
-      // Lost the optimistic race on every retry (or the itinerary vanished).
-      // Other-day edits keep bumping updated_at; refund and ask the client to retry.
-      if (!skipCreditCapture) {
-        await refundCredits(supabaseAdmin, user.userId, "OPTIMIZE_ROUTE").catch(() => {});
-      }
-      return jsonResponse(
-        { error: "Itinerary changed during optimization", code: "CONFLICT" },
-        409,
-      );
-    }
-
     // Count activities the solver could not place within the day (window too
     // short, or unassigned by route constraints) so the client can warn once.
     const unfitCount = results.reduce((sum, result) => sum + result.warnings.length, 0);
-    return jsonResponse({ ok: true, creditCaptured: !skipCreditCapture, unfitCount });
+    return jsonResponse({ ok: true, days: buildClientDays(results), unfitCount });
   } catch (err) {
     console.error(
       JSON.stringify({
@@ -860,20 +738,18 @@ Deno.serve(async (req) => {
         user_id: user.userId,
       }),
     );
-    if (!skipCreditCapture) {
-      const refund = await refundCredits(supabaseAdmin, user.userId, "OPTIMIZE_ROUTE");
-      if (!refund.success) {
-        console.error(
-          JSON.stringify({
-            action: "OPTIMIZE_ROUTE",
-            error: refund.error ?? "refund failed",
-            event: "credit_event",
-            operation_id: operationId,
-            phase: "refund_failed",
-            user_id: user.userId,
-          }),
-        );
-      }
+    const refund = await refundCredits(supabaseAdmin, user.userId, "OPTIMIZE_ROUTE");
+    if (!refund.success) {
+      console.error(
+        JSON.stringify({
+          action: "OPTIMIZE_ROUTE",
+          error: refund.error ?? "refund failed",
+          event: "credit_event",
+          operation_id: operationId,
+          phase: "refund_failed",
+          user_id: user.userId,
+        }),
+      );
     }
     return jsonResponse({ error: "Optimization failed" }, 500);
   }

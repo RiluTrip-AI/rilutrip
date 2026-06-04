@@ -45,22 +45,20 @@ describe("optimize-route edge function source", () => {
     expect(source).toContain("addDaysToIsoDate(startDate, dayNumber - 1)");
   });
 
-  it("writes the optimized order back under an optimistic retry loop", () => {
-    expect(source).toContain("writeOptimizedOrder(");
-    // Each retry re-reads the latest snapshot and writes guarded by updated_at,
-    // so a concurrent edit to another day is preserved rather than clobbered.
-    expect(source).toContain("attempt < MAX_WRITE_RETRIES");
-    expect(source).toContain('.eq("updated_at", current.updatedAt)');
-    // Only a genuine, repeated race reports a conflict instead of overwriting.
-    expect(source).toContain('code: "CONFLICT"');
+  it("returns the optimized order to the client instead of writing it back", () => {
+    // The server is read-only on the itinerary: it computes and returns the
+    // optimized days, and the client applies them via commitItineraryChange
+    // (DB write + Yjs broadcast + undo). No itinerary write-back here.
+    expect(source).toContain("days: buildClientDays(results)");
+    expect(source).not.toContain("writeOptimizedOrder");
+    expect(source).not.toContain('.eq("updated_at"');
+    expect(source).not.toContain('code: "CONFLICT"');
   });
 
-  it("overwrites the optimized day wholesale from the T0 snapshot (other days kept fresh)", () => {
-    // The optimized day is owned by the optimization: built from the snapshot,
-    // not merged onto the fresh row, so concurrent same-day edits are discarded.
-    expect(source).toContain("buildOptimizedDays(input.snapshotData, resultByDay)");
-    expect(source).toContain("optimizedByDay.get(rawDay.day_number) ?? rawDay");
-    expect(source).toContain("snapshotData: itinerary.data");
+  it("drops the unused skip-credit bypass machinery", () => {
+    expect(source).not.toContain("skipCreditCapture");
+    expect(source).not.toContain("internal_optimization_token_hash");
+    expect(source).not.toContain("hasValidGatewaySecret");
   });
 
   it("accepts exactly one day per request so a single charge can't pay for many", () => {
