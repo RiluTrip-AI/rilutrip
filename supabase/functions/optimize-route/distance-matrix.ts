@@ -130,7 +130,7 @@ async function buildGoogleMatrix(
   const apiKey = Deno.env.get("GOOGLE_MAPS_API_KEY");
   if (!apiKey) return null;
 
-  const matrix = points.map((_, i) => points.map((__, j) => (i === j ? 0 : 0)));
+  const matrix = points.map(() => points.map(() => 0));
   const originChunks = chunkPoints(points, GOOGLE_MATRIX_CHUNK_SIZE);
   const destinationChunks = chunkPoints(points, GOOGLE_MATRIX_CHUNK_SIZE);
   const travelMode = toRoutesTravelMode(mode);
@@ -180,6 +180,11 @@ async function buildGoogleMatrix(
             continue;
           }
 
+          // Cells Google can't route (condition !== ROUTE_EXISTS) fall back to a
+          // straight-line estimate. Notably this is every TRANSIT cell in Japan:
+          // Google's Routes/Directions API returns no transit there (licensing
+          // with Japanese operators), so JP transit days are always estimated —
+          // verified against the live API (Taiwan/US/UK transit return real times).
           const minutes = parseRoutesDurationMinutes(element.duration);
           matrix[i][j] =
             element.condition === "ROUTE_EXISTS" && minutes !== null

@@ -622,16 +622,10 @@ async function saveReturnedMatrices(
   );
 }
 
-// Build the full optimized version of each optimized day from the T0 SNAPSHOT
-// (the data we optimized against). The optimization "owns" the day: we take the
-// snapshot day's own activities, apply the optimized order/time, and keep all
-// other snapshot fields. Operates on RAW JSON so note/url/coordinates survive.
-// Concurrent edits to this day during optimization are intentionally discarded
-// by writing this snapshot-derived day wholesale.
-// The optimized order is returned to the client, which applies it through the
-// normal commitItineraryChange path (DB write + Yjs broadcast + undo). The server
-// stays read-only on the itinerary, so the optimize result syncs to collaborators
-// in real time exactly like any other edit and inherits the app's LWW semantics.
+// Shape the optimized days for the client, which applies the new order through
+// commitItineraryChange (DB write + Yjs broadcast + undo). The server stays
+// read-only on the itinerary, so the result syncs to collaborators like any
+// other edit.
 function buildClientDays(results: OptimizedDay[]): Array<{
   dayNumber: number;
   activities: OptimizedDay["activities"];
@@ -665,9 +659,9 @@ Deno.serve(async (req) => {
   });
   if (!canEdit) return jsonResponse({ error: "Forbidden", code: "FORBIDDEN" }, 403);
 
-  // DB is the source of truth: load the stored itinerary and build the optimizer
-  // inputs from it (coords, durations, opening hours, day settings, and a date
-  // derived from start_date) rather than trusting anything in the request body.
+  // DB is the source of truth: build the optimizer inputs from the stored
+  // itinerary (coords, durations, opening hours, day settings, date from
+  // start_date), never from the request body.
   const itinerary = await loadItineraryForOptimize(supabaseAdmin, parsed.data.itineraryId);
   if (!itinerary) {
     return jsonResponse({ error: "Itinerary not found", code: "NOT_FOUND" }, 404);
@@ -682,10 +676,8 @@ Deno.serve(async (req) => {
     requestedDays,
     authHeader,
   );
-  // Gate (and charge) only when at least one day can actually be optimized.
-  // Routable means >= 2 activities with valid coords that also fit their own
-  // window — otherwise optimizeDay returns the original order and charging the
-  // user would bill them for a no-op.
+  // Charge only when a day can actually be optimized (>= 2 located activities
+  // that fit their window); otherwise we'd bill the user for a no-op.
   if (!hasRoutableDay(days)) {
     return jsonResponse(
       { error: "No day has enough routable activities to optimize", code: "NOT_OPTIMIZABLE" },
