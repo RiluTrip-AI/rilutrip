@@ -31,11 +31,11 @@ function delay(ms: number): Promise<void> {
 }
 
 /**
- * Fetch wrapper that retries on 429 with exponential backoff. Mirrors the
- * pattern in `_shared/place-resolver.ts` so Google API quota bursts don't
- * silently downgrade us to Haversine.
+ * Fetch wrapper that retries on HTTP 429 with exponential backoff, so a Google
+ * API quota burst doesn't silently downgrade us to Haversine. This is a retry
+ * on the outbound Google call — not a per-user rate limiter.
  */
-async function rateLimitedFetch(
+async function fetchWithRetry(
   url: string,
   options: RequestInit,
   retries = MAX_FETCH_RETRIES,
@@ -45,7 +45,7 @@ async function rateLimitedFetch(
   if (retries === 0) return resp;
   const backoff = Math.pow(2, MAX_FETCH_RETRIES - retries) * 1000;
   await delay(backoff);
-  return rateLimitedFetch(url, options, retries - 1);
+  return fetchWithRetry(url, options, retries - 1);
 }
 
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
@@ -144,7 +144,7 @@ async function buildGoogleMatrix(
           travelMode,
           ...(travelMode === "DRIVE" && { routingPreference: "TRAFFIC_UNAWARE" }),
         };
-        const res = await rateLimitedFetch(ROUTES_MATRIX_URL, {
+        const res = await fetchWithRetry(ROUTES_MATRIX_URL, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
