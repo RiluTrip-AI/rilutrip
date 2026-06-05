@@ -6,7 +6,7 @@ import { validateEdgeProxyRequest } from "@/lib/api/edge-proxy";
 // the source of truth), so the request only names which day to optimize. Exactly
 // one day per request — OPTIMIZE_ROUTE is charged once.
 const OptimizeRouteSchema = z.object({
-  itineraryId: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i),
+  itineraryId: z.uuid(),
   dayNumbers: z.array(z.number().int().positive()).length(1),
 });
 

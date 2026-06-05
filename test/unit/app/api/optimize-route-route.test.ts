@@ -2,7 +2,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { POST } from "@/app/api/optimize-route/route";
 
 const validBody = {
-  itineraryId: "11111111-1111-1111-1111-111111111111",
+  itineraryId: "11111111-1111-4111-8111-111111111111",
   dayNumbers: [1],
 };
 
@@ -38,7 +38,7 @@ describe("POST /api/optimize-route", () => {
   it("rejects more than one day per request", async () => {
     const res = await POST(
       makeRequest(
-        { itineraryId: "11111111-1111-1111-1111-111111111111", dayNumbers: [1, 2] },
+        { itineraryId: "11111111-1111-4111-8111-111111111111", dayNumbers: [1, 2] },
         { authorization: "Bearer t" },
       ) as never,
     );
