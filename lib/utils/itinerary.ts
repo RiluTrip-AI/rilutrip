@@ -1,5 +1,11 @@
 import type { Day, Itinerary } from "@/types/itinerary";
 import { calculateDayDate } from "@/lib/utils/date";
+import { hasValidCoordinates } from "@/lib/utils/geo";
+
+/** Count a day's activities that have valid coordinates (i.e. are routable). */
+export function countLocatedActivities(day: Day): number {
+  return day.activities.filter((activity) => hasValidCoordinates(activity.location)).length;
+}
 
 /**
  * Adjust the days array to match a new day count.

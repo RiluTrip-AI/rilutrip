@@ -15,7 +15,7 @@ import { DayTransportPicker } from "../components/day-transport-picker";
 import { OptimizeDayButton } from "../components/optimize-day-button";
 import { formatDayHeader } from "@/lib/utils/date";
 import { calculateDayDate } from "@/lib/utils/date";
-import { hasValidCoordinates } from "@/lib/utils/geo";
+import { countLocatedActivities } from "@/lib/utils/itinerary";
 import type { SideBySideViewProps } from "../types";
 
 export function SideBySideView({
@@ -74,9 +74,7 @@ export function SideBySideView({
                       />
                       <OptimizeDayButton
                         dayNumber={day.day_number}
-                        locatedActivityCount={
-                          day.activities.filter((a) => hasValidCoordinates(a.location)).length
-                        }
+                        locatedActivityCount={countLocatedActivities(day)}
                         isOptimizing={optimizingDays.has(day.day_number)}
                         onOptimize={optimizeDay}
                       />

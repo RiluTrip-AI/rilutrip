@@ -12,10 +12,9 @@ import { getEffectivePermission } from "@/lib/supabase/shares";
 import { applyOperations, type OperationsUpdate } from "@/lib/ai/operations";
 import { aiClient, ApiError } from "@/lib/ai/client";
 import { calcDayCount } from "@/lib/utils/date";
-import { adjustDays } from "@/lib/utils/itinerary";
+import { adjustDays, countLocatedActivities } from "@/lib/utils/itinerary";
 import { resolvePlaceDetails, type ResolveStatus } from "@/lib/places/place-resolver";
 import { getAccessToken } from "@/lib/supabase/client";
-import { hasValidCoordinates } from "@/lib/utils/geo";
 
 let pollingIntervalHandle: ReturnType<typeof setInterval> | null = null;
 
@@ -771,8 +770,7 @@ export const useItineraryStore = create<ItineraryState>((set, get) => ({
     const day = state.itinerary.days.find((d) => d.day_number === dayNumber);
     if (!day) return { ok: false, reason: "ERROR" };
 
-    const located = day.activities.filter((a) => hasValidCoordinates(a.location));
-    if (located.length < 2) {
+    if (countLocatedActivities(day) < 2) {
       return { ok: false, reason: "NOT_ENOUGH_LOCATED" };
     }
 
