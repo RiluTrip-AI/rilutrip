@@ -36,7 +36,7 @@
     "highlight.js": "^11.11.1",
     "lucide-react": "^0.562.0",
     "mapbox-gl": "^3.18.1",
-    "next": "^16.2.6",
+    "next": "^16.3.4",
     "next-intl": "^4.9.2",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
@@ -62,8 +62,8 @@
     "@types/react-dom": "^19.2.3",
     "@types/uuid": "^10.0.0",
     "@vitejs/plugin-react": "^5.1.2",
-    "@vitest/coverage-v8": "^4.0.16",
-    "@vitest/ui": "^4.0.16",
+    "@vitest/coverage-v8": "^5.0.0",
+    "@vitest/ui": "^5.0.0",
     "autoprefixer": "^10.4.23",
     "dotenv": "^17.2.3",
     "eslint": "^9.39.2",
@@ -76,6 +76,6 @@
     "tailwindcss-animate": "^1.0.7",
     "tsx": "^4.22.4",
     "typescript": "^5.9.3",
-    "vitest": "^4.0.16"
+    "vitest": "^5.0.0"
   }
 }
