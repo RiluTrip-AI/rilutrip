@@ -188,11 +188,11 @@ NEXT_PUBLIC_YJS_SERVER_URL=wss://yjs.rilutrip.com
 
 ### `/api/resolve-places`
 
-用於將地點名稱轉換為詳細的 Google Maps 資訊（包含經緯度、評分、營業時間等）。此 API 會透過 Supabase Edge Function 代理請求，並使用資料庫快取來節省 Google Maps API 呼叫額度。
+Converts place names into detailed Google Maps information (including coordinates, ratings, opening hours, and more). This API proxies requests through a Supabase Edge Function and uses a database cache to save Google Maps API quota.
 
 **Endpoint:** `POST /api/resolve-places`
 
-**Authentication:** Required (需在 Header 提供 `Authorization: Bearer <Supabase Access Token>`)
+**Authentication:** Required (provide `Authorization: Bearer <Supabase Access Token>` in the header)
 
 **Request Body:**
 
@@ -200,34 +200,34 @@ NEXT_PUBLIC_YJS_SERVER_URL=wss://yjs.rilutrip.com
 {
   "places": [
     {
-      "id": "1", // 必填：自訂 ID，用於對應回傳結果
-      "name": "台北101", // 必填：搜尋的地點名稱 (長度 1~50)
-      "lat": 25.0339, // 選填：用於提高搜尋精準度的基準緯度
-      "lng": 121.5644 // 選填：用於提高搜尋精準度的基準經度
+      "id": "1", // Required: custom ID, used to match the returned results
+      "name": "Taipei 101", // Required: the place name to search for (length 1-50)
+      "lat": 25.0339, // Optional: reference latitude to improve search accuracy
+      "lng": 121.5644 // Optional: reference longitude to improve search accuracy
     }
   ]
 }
 ```
 
-_備註：每次請求的 `places` 數量必須介於 1 到 10 之間。_
+_Note: the number of `places` per request must be between 1 and 10._
 
 **Response:**
-回傳狀態碼 `200 OK` 及以下 JSON 結構：
+Returns status code `200 OK` with the following JSON structure:
 
 ```json
 {
   "resolved": [
     {
-      "id": "1",                           // 對應請求時傳入的 ID
-      "place_id": "ChIJ...",               // Google Maps Place ID (若找到的話)
-      "name": "Taipei 101",                // Google Maps 上的正式名稱 (或 fallback 原名稱)
-      "lat": 25.0339639,                   // (選填) 緯度
-      "lng": 121.5644722,                  // (選填) 經度
-      "rating": 4.6,                       // (選填) 地點評分
-      "user_ratings_total": 85000,         // (選填) 評論總數
-      "website": "https://www.taipei-101.com.tw/", // (選填) 官方網站
-      "opening_hours": { ... },            // (選填) 營業時間結構
-      "error": "NOT_FOUND"                 // (選填) 若地點找不到則會有此欄位
+      "id": "1",                           // The ID passed in with the request
+      "place_id": "ChIJ...",               // Google Maps Place ID (if found)
+      "name": "Taipei 101",                // Official name on Google Maps (or the original name as fallback)
+      "lat": 25.0339639,                   // (Optional) Latitude
+      "lng": 121.5644722,                  // (Optional) Longitude
+      "rating": 4.6,                       // (Optional) Place rating
+      "user_ratings_total": 85000,         // (Optional) Total number of reviews
+      "website": "https://www.taipei-101.com.tw/", // (Optional) Official website
+      "opening_hours": { ... },            // (Optional) Opening hours structure
+      "error": "NOT_FOUND"                 // (Optional) Present if the place could not be found
     }
   ]
 }
