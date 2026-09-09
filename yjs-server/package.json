@@ -12,7 +12,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.89.0",
     "dotenv": "^17.4.2",
-    "ws": "^8.20.1",
+    "ws": "^8.21.3",
     "y-websocket": "^2.1.0",
     "yjs": "^13.6.28"
   },
@@ -21,6 +21,6 @@
     "@types/ws": "^8.5.10",
     "tsx": "^4.22.4",
     "typescript": "^5.0.0",
-    "vitest": "^4.1.0"
+    "vitest": "^5.0.0"
   }
 }
