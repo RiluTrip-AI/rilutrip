@@ -98,6 +98,17 @@ vi.mock("next-intl", () => {
     "planner.transportMode.title": "Day {dayNumber} transport",
     "planner.transportMode.applyAllMode": "Apply {mode} to all days",
     "planner.transportMode.applyAllSuccess": "Applied {mode} to all days",
+    // Optimize route
+    "planner.optimizeRoute.button": "Optimize route",
+    "planner.optimizeRoute.optimizing": "Optimizing…",
+    "planner.optimizeRoute.success": "Route optimized",
+    "planner.optimizeRoute.warningUnfit":
+      "{count} activities couldn't be scheduled and were moved to the end",
+    "planner.optimizeRoute.warningMissingSettings":
+      "Set this day's time range and transport mode before optimizing",
+    "planner.optimizeRoute.errorUnauthorized": "Please log in to optimize this route.",
+    "planner.optimizeRoute.errorInsufficientCredits": "Not enough credits to optimize",
+    "planner.optimizeRoute.errorGeneric": "Couldn't optimize the route. Please try again later.",
     // Day time display
     "planner.dayTimeDisplay.title": "Day {dayNumber} Time Range",
     "planner.dayTimeDisplay.noTime": "Set hours",

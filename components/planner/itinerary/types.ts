@@ -3,6 +3,7 @@
  */
 
 import type { Itinerary, Activity, Day, TransportMode } from "@/types/itinerary";
+import type { OptimizeDayResult } from "./store";
 
 export type ViewMode = "expandable" | "single-day" | "side-by-side";
 
@@ -71,6 +72,8 @@ export interface ExpandableViewProps {
   setAllDaysTimeWindow?: (startTime: string, endTime: string) => Promise<void>;
   setDayTransportMode?: (dayNumber: number, mode: TransportMode) => Promise<void>;
   setAllDaysTransportMode?: (mode: TransportMode) => Promise<void>;
+  optimizeDay?: (dayNumber: number) => Promise<OptimizeDayResult>;
+  optimizingDays: Set<number>;
 }
 
 export interface SingleDayViewProps {
@@ -86,6 +89,8 @@ export interface SingleDayViewProps {
   setAllDaysTimeWindow?: (startTime: string, endTime: string) => Promise<void>;
   setDayTransportMode?: (dayNumber: number, mode: TransportMode) => Promise<void>;
   setAllDaysTransportMode?: (mode: TransportMode) => Promise<void>;
+  optimizeDay?: (dayNumber: number) => Promise<OptimizeDayResult>;
+  optimizingDays: Set<number>;
 }
 
 export interface SideBySideViewProps {
@@ -99,4 +104,6 @@ export interface SideBySideViewProps {
   setAllDaysTimeWindow?: (startTime: string, endTime: string) => Promise<void>;
   setDayTransportMode?: (dayNumber: number, mode: TransportMode) => Promise<void>;
   setAllDaysTransportMode?: (mode: TransportMode) => Promise<void>;
+  optimizeDay?: (dayNumber: number) => Promise<OptimizeDayResult>;
+  optimizingDays: Set<number>;
 }

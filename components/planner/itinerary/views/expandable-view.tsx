@@ -12,8 +12,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DayActivitiesList } from "../components/day-activities-list";
 import { DayTimePicker } from "../components/day-time-picker";
 import { DayTransportPicker } from "../components/day-transport-picker";
+import { OptimizeDayButton } from "../components/optimize-day-button";
 import { formatDayHeader } from "@/lib/utils/date";
 import { calculateDayDate } from "@/lib/utils/date";
+import { countLocatedActivities } from "@/lib/utils/itinerary";
 import type { ExpandableViewProps } from "../types";
 
 export function ExpandableView({
@@ -29,6 +31,8 @@ export function ExpandableView({
   setAllDaysTimeWindow,
   setDayTransportMode,
   setAllDaysTransportMode,
+  optimizeDay,
+  optimizingDays,
 }: ExpandableViewProps) {
   const locale = useLocale();
 
@@ -70,6 +74,12 @@ export function ExpandableView({
                       mode={day.transport_mode}
                       onSave={setDayTransportMode}
                       onApplyAll={setAllDaysTransportMode}
+                    />
+                    <OptimizeDayButton
+                      dayNumber={day.day_number}
+                      locatedActivityCount={countLocatedActivities(day)}
+                      isOptimizing={optimizingDays.has(day.day_number)}
+                      onOptimize={optimizeDay}
                     />
                   </div>
                 </div>

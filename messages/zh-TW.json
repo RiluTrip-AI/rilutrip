@@ -198,6 +198,17 @@
     "activityPlaceholderCard": {
       "clickToAdd": "點擊新增"
     },
+    "optimizeRoute": {
+      "button": "優化路線",
+      "optimizing": "優化中…",
+      "success": "路線已優化",
+      "warningUnfit": "{count} 個活動排不進當天時段，已移到最後",
+      "warningMissingSettings": "請先設定這天的時間範圍與交通方式，再優化路線",
+      "warningNotEnoughLocated": "請先為這天加入至少 2 個有地點的活動，再優化路線",
+      "errorUnauthorized": "請先登入，才能優化路線。",
+      "errorInsufficientCredits": "點數不足，無法優化",
+      "errorGeneric": "無法優化路線，請稍後再試"
+    },
     "editMetadataDialog": {
       "title": "編輯行程資訊",
       "description": "在此修改您的行程資訊。完成後請點擊儲存。",

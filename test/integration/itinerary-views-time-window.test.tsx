@@ -10,6 +10,16 @@ vi.mock("@/lib/utils/date", () => ({
   calculateDayDate: () => "2026-05-01",
 }));
 
+// Views now render OptimizeDayButton, which reads the profile (and thus useAuth).
+vi.mock("@/hooks/use-profile", () => ({
+  useProfile: () => ({
+    profile: null,
+    credits: 0,
+    tier: "free",
+    refreshProfile: vi.fn().mockResolvedValue(undefined),
+  }),
+}));
+
 import { ExpandableView } from "@/components/planner/itinerary/views/expandable-view";
 import { SingleDayView } from "@/components/planner/itinerary/views/single-day-view";
 import { SideBySideView } from "@/components/planner/itinerary/views/side-by-side-view";
@@ -48,6 +58,7 @@ describe("ExpandableView - DayTimePicker integration", () => {
         itinerary={baseItinerary}
         draggingActivityId={null}
         crossDayDragInfo={null}
+        optimizingDays={new Set()}
         expandedDays={new Set()}
         toggleDay={vi.fn()}
         setDayTimeWindow={noop}
@@ -67,6 +78,7 @@ describe("ExpandableView - DayTimePicker integration", () => {
         itinerary={baseItinerary}
         draggingActivityId={null}
         crossDayDragInfo={null}
+        optimizingDays={new Set()}
         expandedDays={new Set()}
         toggleDay={vi.fn()}
       />,
@@ -83,6 +95,7 @@ describe("ExpandableView - DayTimePicker integration", () => {
         itinerary={baseItinerary}
         draggingActivityId={null}
         crossDayDragInfo={null}
+        optimizingDays={new Set()}
         expandedDays={new Set()}
         toggleDay={vi.fn()}
         setDayTimeWindow={noop}
@@ -107,6 +120,7 @@ describe("ExpandableView - DayTimePicker integration", () => {
         itinerary={itinerary}
         draggingActivityId={null}
         crossDayDragInfo={null}
+        optimizingDays={new Set()}
         expandedDays={new Set()}
         toggleDay={vi.fn()}
         setDayTimeWindow={noop}
@@ -140,6 +154,7 @@ describe("SingleDayView - DayTimePicker integration", () => {
         currentDayIndex={0}
         draggingActivityId={null}
         crossDayDragInfo={null}
+        optimizingDays={new Set()}
         goToPreviousDay={vi.fn()}
         goToNextDay={vi.fn()}
         setDayTimeWindow={noop}
@@ -158,6 +173,7 @@ describe("SingleDayView - DayTimePicker integration", () => {
         currentDayIndex={0}
         draggingActivityId={null}
         crossDayDragInfo={null}
+        optimizingDays={new Set()}
         goToPreviousDay={vi.fn()}
         goToNextDay={vi.fn()}
       />,
@@ -173,6 +189,7 @@ describe("SingleDayView - DayTimePicker integration", () => {
         currentDayIndex={0}
         draggingActivityId={null}
         crossDayDragInfo={null}
+        optimizingDays={new Set()}
         goToPreviousDay={vi.fn()}
         goToNextDay={vi.fn()}
         setDayTimeWindow={noop}
@@ -201,6 +218,7 @@ describe("SideBySideView - DayTimePicker integration", () => {
         itinerary={baseItinerary}
         draggingActivityId={null}
         crossDayDragInfo={null}
+        optimizingDays={new Set()}
         setDayTimeWindow={noop}
         setAllDaysTimeWindow={noop}
       />,
@@ -218,6 +236,7 @@ describe("SideBySideView - DayTimePicker integration", () => {
         itinerary={baseItinerary}
         draggingActivityId={null}
         crossDayDragInfo={null}
+        optimizingDays={new Set()}
       />,
     );
     const buttons = screen.getAllByRole("button", { name: /\d{2}:\d{2}.*\d{2}:\d{2}/i });
@@ -232,6 +251,7 @@ describe("SideBySideView - DayTimePicker integration", () => {
         itinerary={baseItinerary}
         draggingActivityId={null}
         crossDayDragInfo={null}
+        optimizingDays={new Set()}
         setDayTimeWindow={noop}
         setAllDaysTimeWindow={noop}
       />,

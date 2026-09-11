@@ -12,13 +12,26 @@ import { getEffectivePermission } from "@/lib/supabase/shares";
 import { applyOperations, type OperationsUpdate } from "@/lib/ai/operations";
 import { aiClient, ApiError } from "@/lib/ai/client";
 import { calcDayCount } from "@/lib/utils/date";
-import { adjustDays } from "@/lib/utils/itinerary";
+import { adjustDays, countLocatedActivities } from "@/lib/utils/itinerary";
 import { resolvePlaceDetails, type ResolveStatus } from "@/lib/places/place-resolver";
+import { getAccessToken } from "@/lib/supabase/client";
 
 let pollingIntervalHandle: ReturnType<typeof setInterval> | null = null;
 
 const MAX_HISTORY_ENTRIES = 50;
 type ItineraryErrorKind = "access" | "load" | "runtime" | null;
+
+export type OptimizeDayResult =
+  | { ok: true; unfitCount: number }
+  | {
+      ok: false;
+      reason:
+        | "NOT_ENOUGH_LOCATED"
+        | "MISSING_SETTINGS"
+        | "UNAUTHORIZED"
+        | "INSUFFICIENT_CREDITS"
+        | "ERROR";
+    };
 
 interface ItineraryState {
   // Data State
@@ -35,6 +48,11 @@ interface ItineraryState {
   isSaving: boolean;
   saveError: boolean;
   generationAbortController: AbortController | null;
+
+  // Route Optimization State. A Set (not a single number) so several days can
+  // optimize concurrently without their spinners clobbering each other.
+  optimizingDays: Set<number>;
+  optimizeDay: (dayNumber: number) => Promise<OptimizeDayResult>;
 
   // Interaction State
   previewBaseItinerary: Itinerary | null;
@@ -147,6 +165,7 @@ export const useItineraryStore = create<ItineraryState>((set, get) => ({
   isSaving: false,
   saveError: false,
   generationAbortController: null,
+  optimizingDays: new Set(),
   previewBaseItinerary: null,
   previewItinerary: null,
   crossDayDragInfo: null,
@@ -740,6 +759,102 @@ export const useItineraryStore = create<ItineraryState>((set, get) => ({
       throw err;
     } finally {
       set({ isSaving: false });
+    }
+  },
+
+  optimizeDay: async (dayNumber) => {
+    const state = get();
+    if (!state.itinerary || !get().canEdit()) {
+      return { ok: false, reason: "ERROR" };
+    }
+    const day = state.itinerary.days.find((d) => d.day_number === dayNumber);
+    if (!day) return { ok: false, reason: "ERROR" };
+
+    if (countLocatedActivities(day) < 2) {
+      return { ok: false, reason: "NOT_ENOUGH_LOCATED" };
+    }
+
+    // A meaningful optimization needs the day's own time window and transport
+    // mode. These can be absent (the generator drops invalid/missing values
+    // rather than guessing); require them and tell the user to fill them in
+    // instead of optimizing on fabricated defaults.
+    const { transport_mode, start_time, end_time } = day;
+    if (!transport_mode || !start_time || !end_time) {
+      return { ok: false, reason: "MISSING_SETTINGS" };
+    }
+
+    const itineraryId = state.itinerary.id;
+    set((s) => ({ optimizingDays: new Set(s.optimizingDays).add(dayNumber) }));
+    try {
+      const token = await getAccessToken();
+      const res = await fetch("/api/optimize-route", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+        // DB is the source of truth: the server reads the stored itinerary and
+        // writes the optimized order back, so we only name the day to optimize.
+        body: JSON.stringify({ itineraryId, dayNumbers: [dayNumber] }),
+      });
+
+      if (!res.ok) {
+        const reason =
+          res.status === 401
+            ? "UNAUTHORIZED"
+            : res.status === 402
+              ? "INSUFFICIENT_CREDITS"
+              : "ERROR";
+        return { ok: false, reason };
+      }
+
+      // The server only computes — it returns the optimized order and leaves the
+      // DB untouched. Apply it onto the LATEST local itinerary (so a concurrent
+      // edit to another day survives) and persist through commitItineraryChange,
+      // which writes the DB, pushes history for Undo, and broadcasts to Yjs —
+      // exactly the path every other edit takes.
+      const body = (await res.json().catch(() => ({}))) as {
+        unfitCount?: number;
+        days?: Array<{
+          dayNumber: number;
+          activities: Array<{ id: string; time: string; order: number }>;
+        }>;
+      };
+      const optimized = body.days?.find((d) => d.dayNumber === dayNumber);
+      const current = get().itinerary;
+      if (optimized && current) {
+        const orderById = new Map(optimized.activities.map((a) => [a.id, a.order]));
+        const timeById = new Map(optimized.activities.map((a) => [a.id, a.time]));
+        // Activities the server didn't return (rare divergence) keep their place
+        // after the optimized ones.
+        const fallbackBase = optimized.activities.length;
+        const nextItinerary: Itinerary = {
+          ...current,
+          days: current.days.map((d) => {
+            if (d.day_number !== dayNumber) return d;
+            let extra = 0;
+            const activities = d.activities
+              .map((a) => ({
+                ...a,
+                time: timeById.get(a.id) ?? a.time,
+                order: orderById.get(a.id) ?? fallbackBase + extra++,
+              }))
+              .sort((x, y) => x.order - y.order);
+            return { ...d, activities };
+          }),
+        };
+        await get().commitItineraryChange(nextItinerary);
+      }
+      return { ok: true, unfitCount: typeof body.unfitCount === "number" ? body.unfitCount : 0 };
+    } catch (err) {
+      console.error("Failed to optimize day route:", err);
+      return { ok: false, reason: "ERROR" };
+    } finally {
+      set((s) => {
+        const next = new Set(s.optimizingDays);
+        next.delete(dayNumber);
+        return { optimizingDays: next };
+      });
     }
   },
 
